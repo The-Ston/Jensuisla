@@ -43,6 +43,7 @@ export interface MyProgressView {
 }
 
 export interface ReadingView {
+  viewerId: string;
   reading: ReadingSummary;
   participants: ParticipantView[];
   me: MyProgressView | null;

@@ -183,6 +183,7 @@ export class Service {
     }
 
     return {
+      viewerId: userId,
       reading: this.summary(entry, userId),
       participants: [...entry.participants.values()].map(({ value }) => ({ userId: value.userId, progress: value.progress })),
       me: me && {
