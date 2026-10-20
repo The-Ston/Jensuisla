@@ -1,5 +1,5 @@
 import { ChannelType, Permission, type DiscordApi, type FileUpload, type PermissionOverwrite } from '../discord/api';
-import type { Comment, Participant, Reading, UserPrefs } from '../domain/types';
+import type { Comment, Participant, Photo, Reading, UserPrefs } from '../domain/types';
 import { decode, encode } from './codec';
 
 export const CATEGORY_NAME = 'jensuisla-data';
@@ -16,6 +16,7 @@ export interface ReadingEntry {
   messageId: string;
   participants: Map<string, Stored<Participant>>;
   comments: Map<string, Comment>;
+  photos: Map<string, Photo>;
 }
 
 export interface StoreConfig {
@@ -114,12 +115,15 @@ export class DataStore {
     let entry: ReadingEntry | undefined;
     const participants = new Map<string, Stored<Participant>>();
     const comments = new Map<string, Comment>();
+    const photos = new Map<string, Photo>();
     for (const msg of await this.allMessages(channelId)) {
       const rec = decode(msg.content);
       if (!rec) continue;
-      if (rec.t === 'reading') entry = { reading: { ...rec.v, id: channelId }, messageId: msg.id, participants, comments };
+      if (rec.t === 'reading')
+        entry = { reading: { ...rec.v, id: channelId }, messageId: msg.id, participants, comments, photos };
       else if (rec.t === 'participant') participants.set(rec.v.userId, { value: rec.v, messageId: msg.id });
       else if (rec.t === 'comment') comments.set(msg.id, { ...rec.v, id: msg.id });
+      else if (rec.t === 'photo') photos.set(msg.id, { ...rec.v, id: msg.id });
     }
     if (entry) this.readings.set(channelId, entry);
   }
@@ -137,6 +141,7 @@ export class DataStore {
       messageId: msg.id,
       participants: new Map(),
       comments: new Map(),
+      photos: new Map(),
     };
     this.readings.set(channel.id, entry);
     return entry;
@@ -182,6 +187,26 @@ export class DataStore {
     const entry = this.mustGet(readingId);
     await this.api.deleteMessage(readingId, commentId);
     entry.comments.delete(commentId);
+  }
+
+  async createPhoto(readingId: string, data: Omit<Photo, 'id'>, file: FileUpload): Promise<Photo> {
+    const entry = this.mustGet(readingId);
+    const msg = await this.api.createMessage(readingId, { content: encode({ t: 'photo', v: data }) }, file);
+    const photo = { ...data, id: msg.id };
+    entry.photos.set(msg.id, photo);
+    return photo;
+  }
+
+  async deletePhoto(readingId: string, photoId: string): Promise<void> {
+    const entry = this.mustGet(readingId);
+    await this.api.deleteMessage(readingId, photoId);
+    entry.photos.delete(photoId);
+  }
+
+  /** Fresh URL of a photo file (Discord attachment URLs expire). */
+  async photoAttachmentUrl(readingId: string, photoId: string): Promise<string | null> {
+    const msg = await this.api.getMessage(readingId, photoId);
+    return msg.attachments[0]?.url ?? null;
   }
 
   async saveUserPrefs(prefs: UserPrefs): Promise<void> {

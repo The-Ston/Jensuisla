@@ -157,8 +157,8 @@
     }
   }
 
-  const sendComment = (text: string, gif: Gif | null, position: number, replyTo: string | null) =>
-    mutate(() => api.comment(id, { position, text, gif, replyTo }));
+  const sendComment = (text: string, gif: Gif | null, position: number, replyTo: string | null, photos: string[]) =>
+    mutate(() => api.comment(id, { position, text, gif, replyTo, photos }));
 
   function replyTo(comment: Comment) {
     composerReply = comment;
@@ -304,7 +304,9 @@
               {myProgress}
               onJumpToPosition={jumpToPosition}
               onReply={() => replyTo(comment)}
-              onEdit={(text, gif) => mutate(() => api.editComment(id, comment.id, text, gif))}
+              readingId={id}
+              photoUrls={view.photoUrls}
+              onEdit={(text, gif, photos) => mutate(() => api.editComment(id, comment.id, text, gif, photos))}
               onDelete={() => mutate(() => api.deleteComment(id, comment.id))}
             />
           {:else}
@@ -322,6 +324,7 @@
           bind:position={composerPosition}
           bind:replyTo={composerReply}
           replyAuthor={composerReply ? (view.members[composerReply.authorId]?.name ?? '') : ''}
+          readingId={id}
           {scale}
           max={myProgress}
           onSend={sendComment}

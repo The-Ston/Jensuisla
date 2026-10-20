@@ -6,6 +6,7 @@ import type {
   HomeView,
   MemberView,
   NotifyPref,
+  PhotoRef,
   ReadingSummary,
   ReadingView,
 } from '$shared/api-types';
@@ -53,11 +54,29 @@ export const api = {
     call<ReadingView>('POST', `${r(id)}/progress`, { value, editionTotal }),
   undo: (id: string) => call<ReadingView>('POST', `${r(id)}/undo`),
   visited: (id: string) => call<null>('POST', `${r(id)}/visited`),
-  comment: (id: string, input: { position: number; text: string; gif: Gif | null; replyTo: string | null }) =>
-    call<ReadingView>('POST', `${r(id)}/comments`, input),
-  /** `gif`: undefined keeps the current GIF, null removes it. */
-  editComment: (id: string, commentId: string, text: string, gif?: Gif | null) =>
-    call<ReadingView>('PATCH', `${r(id)}/comments/${commentId}`, gif === undefined ? { text } : { text, gif }),
+  comment: (
+    id: string,
+    input: { position: number; text: string; gif: Gif | null; replyTo: string | null; photos: string[] },
+  ) => call<ReadingView>('POST', `${r(id)}/comments`, input),
+  /** `gif` / `photos`: undefined keeps the current ones. */
+  editComment: (id: string, commentId: string, text: string, gif?: Gif | null, photos?: string[]) =>
+    call<ReadingView>('PATCH', `${r(id)}/comments/${commentId}`, {
+      text,
+      ...(gif === undefined ? {} : { gif }),
+      ...(photos === undefined ? {} : { photos }),
+    }),
+  /** Sends a photo file as is (original quality). */
+  async uploadPhoto(id: string, file: File, width: number, height: number): Promise<PhotoRef> {
+    const res = await fetch(`/api${r(id)}/photos?w=${width}&h=${height}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': file.type },
+      body: file,
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new ApiError(res.status, (data as { error?: string } | null)?.error ?? 'Envoi impossible');
+    return data as PhotoRef;
+  },
+  discardPhoto: (id: string, photoId: string) => call<null>('DELETE', `${r(id)}/photos/${photoId}`),
   deleteComment: (id: string, commentId: string) => call<ReadingView>('DELETE', `${r(id)}/comments/${commentId}`),
   react: (id: string, commentId: string, emoji: string) =>
     call<ReadingView>('POST', `${r(id)}/comments/${commentId}/reactions`, { emoji }),

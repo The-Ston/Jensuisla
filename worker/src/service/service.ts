@@ -13,6 +13,9 @@ import {
   MAX_COMMENT_LENGTH,
   MAX_COVER_BYTES,
   MAX_FAVORITE_GIFS,
+  MAX_PHOTO_BYTES,
+  MAX_PHOTOS,
+  PHOTO_TYPES,
   MAX_TITLE_LENGTH,
   MAX_TOTAL,
 } from '../domain/limits';
@@ -27,7 +30,16 @@ import {
   toReference,
   undoProgress,
 } from '../domain/progress';
-import type { Comment, Gif, JoinMode, NotifyPref, Participant, ProgressUnit, UserPrefs } from '../domain/types';
+import type {
+  Comment,
+  Gif,
+  JoinMode,
+  NotifyPref,
+  Participant,
+  PhotoRef,
+  ProgressUnit,
+  UserPrefs,
+} from '../domain/types';
 import { gifFromId, GIPHY_ID } from '../gifs';
 import type { DataStore, ReadingEntry } from '../store/data-store';
 import type { NotifyEvent } from './notifications';
@@ -56,9 +68,14 @@ export interface ServiceDeps {
   members: () => Promise<Map<string, MemberInfo>>;
   /** Emojis of the Discord server, by id. */
   emojis: () => Promise<Map<string, EmojiInfo>>;
+  /** Signed link to a photo, only handed to readers allowed to see it. */
+  signPhoto: (readingId: string, photoId: string) => Promise<string>;
   onEvent: (event: NotifyEvent) => void;
   now?: () => number;
 }
+
+/** Unsent photos a reader may have waiting, so abandoned uploads can't pile up forever. */
+const MAX_PENDING_PHOTOS = 8;
 
 const UNITS: ProgressUnit[] = ['chapter', 'page', 'percent'];
 const JOIN_MODES: JoinMode[] = ['invite', 'open', 'both'];
@@ -203,6 +220,10 @@ export class Service {
       const m = all.get(id);
       members[id] = m ? { id: m.id, name: m.name, avatarUrl: m.avatarUrl } : fallbackMember(id);
     }
+    // Signed links only for photos of comments this reader is allowed to see.
+    const photoUrls: Record<string, string> = {};
+    for (const c of comments)
+      for (const p of c.photos ?? []) photoUrls[p.id] = await this.deps.signPhoto(readingId, p.id);
 
     return {
       viewerId: userId,
@@ -217,6 +238,7 @@ export class Service {
       },
       comments,
       members,
+      photoUrls,
     };
   }
 
@@ -272,7 +294,7 @@ export class Service {
   async addComment(
     userId: string,
     readingId: string,
-    input: { position: number; text: string; gif: Gif | null; replyTo?: string | null },
+    input: { position: number; text: string; gif: Gif | null; replyTo?: string | null; photos?: string[] },
   ): Promise<Comment> {
     const entry = this.entry(readingId);
     const me = this.participant(entry, userId);
@@ -280,7 +302,8 @@ export class Service {
       throw new HttpError(400, 'Tu ne peux commenter que ce que tu as déjà lu');
     const text = sanitizePageRefs((input.text ?? '').trim(), entry.reading.unit, entry.reading.total);
     const gif = this.validGif(input.gif);
-    if (!text && !gif) throw new HttpError(400, 'Commentaire vide');
+    const photos = this.claimPhotos(entry, userId, input.photos ?? [], []);
+    if (!text && !gif && photos.length === 0) throw new HttpError(400, 'Commentaire vide');
     if (text.length > MAX_COMMENT_LENGTH) throw new HttpError(400, 'Commentaire trop long');
 
     // A reply quotes its original: placing it earlier would reveal the original to readers
@@ -294,6 +317,7 @@ export class Service {
       position: input.position,
       text,
       gif,
+      photos,
       reactions: {},
       replyTo: original?.id ?? null,
       createdAt: this.now(),
@@ -301,7 +325,7 @@ export class Service {
     });
     this.deps.onEvent({
       readingId,
-      kind: original ? 'reply' : gif && !text ? 'gif' : 'comment',
+      kind: original ? 'reply' : text ? 'comment' : photos.length ? 'photo' : 'gif',
       actorId: userId,
       position: comment.position,
       // Never cut a page token in half: it would show up raw in the notification.
@@ -332,21 +356,28 @@ export class Service {
     return comment;
   }
 
-  /** `gif`: undefined keeps the current GIF, null removes it. */
+  /** `gif` / `photos`: undefined keeps the current ones; null / a new list replaces them. */
   async editComment(
     userId: string,
     readingId: string,
     commentId: string,
     text: string,
     gif?: Gif | null,
+    photoIds?: string[],
   ): Promise<void> {
     const entry = this.entry(readingId);
     const comment = this.visibleComment(entry, userId, commentId);
     if (comment.authorId !== userId) throw new HttpError(403, "Ce n'est pas ton commentaire");
     const trimmed = sanitizePageRefs((text ?? '').trim(), entry.reading.unit, entry.reading.total);
     const nextGif = gif === undefined ? comment.gif : this.validGif(gif);
-    if ((!trimmed && !nextGif) || trimmed.length > MAX_COMMENT_LENGTH) throw new HttpError(400, 'Commentaire invalide');
-    await this.store.saveComment(readingId, { ...comment, text: trimmed, gif: nextGif, editedAt: this.now() });
+    const current = comment.photos ?? [];
+    const photos = photoIds === undefined ? current : this.claimPhotos(entry, userId, photoIds, current);
+    if ((!trimmed && !nextGif && photos.length === 0) || trimmed.length > MAX_COMMENT_LENGTH)
+      throw new HttpError(400, 'Commentaire invalide');
+    await this.store.saveComment(readingId, { ...comment, text: trimmed, gif: nextGif, photos, editedAt: this.now() });
+    // Photos taken out of the comment are deleted for good.
+    for (const removed of current.filter((p) => !photos.some((q) => q.id === p.id)))
+      await this.store.deletePhoto(readingId, removed.id).catch(() => undefined);
   }
 
   async deleteComment(userId: string, readingId: string, commentId: string): Promise<void> {
@@ -355,8 +386,68 @@ export class Service {
     if (comment.authorId !== userId && entry.reading.organizerId !== userId)
       throw new HttpError(403, "Ce n'est pas ton commentaire");
     await this.store.deleteComment(readingId, commentId);
+    for (const photo of comment.photos ?? []) await this.store.deletePhoto(readingId, photo.id).catch(() => undefined);
   }
 
+  /** Ids of photos already attached to a comment. */
+  private attachedPhotos(entry: ReadingEntry): Set<string> {
+    const ids = new Set<string>();
+    for (const c of entry.comments.values()) for (const p of c.photos ?? []) ids.add(p.id);
+    return ids;
+  }
+
+  /**
+   * Validates the photos of a comment: each is either already in it (`keep`) or uploaded by the
+   * author and not attached anywhere yet.
+   */
+  private claimPhotos(entry: ReadingEntry, userId: string, ids: unknown[], keep: PhotoRef[]): PhotoRef[] {
+    if (!Array.isArray(ids) || ids.length > MAX_PHOTOS) throw new HttpError(400, `${MAX_PHOTOS} photos maximum`);
+    const attached = this.attachedPhotos(entry);
+    const unique = [...new Set(ids.map(String))];
+    return unique.map((id) => {
+      const kept = keep.find((p) => p.id === id);
+      if (kept) return kept;
+      const photo = entry.photos.get(id);
+      if (!photo || photo.uploaderId !== userId || attached.has(id)) throw new HttpError(400, 'Photo introuvable');
+      return { id, width: photo.width, height: photo.height };
+    });
+  }
+
+  /** Stores a photo before the comment that uses it is sent. Returns its reference. */
+  async uploadPhoto(
+    userId: string,
+    readingId: string,
+    file: { data: Uint8Array; contentType: string },
+    width: number,
+    height: number,
+  ): Promise<PhotoRef> {
+    const entry = this.entry(readingId);
+    this.participant(entry, userId);
+    if (!PHOTO_TYPES.includes(file.contentType)) throw new HttpError(400, 'Format non pris en charge (JPEG, PNG, WebP ou GIF)');
+    if (file.data.byteLength === 0 || file.data.byteLength > MAX_PHOTO_BYTES)
+      throw new HttpError(400, 'Photo trop lourde (10 Mo maximum)');
+    const attached = this.attachedPhotos(entry);
+    const pending = [...entry.photos.values()]
+      .filter((p) => p.uploaderId === userId && !attached.has(p.id))
+      .sort((a, b) => a.createdAt - b.createdAt);
+    // Forgotten uploads (comment never sent) make room for new ones.
+    while (pending.length >= MAX_PENDING_PHOTOS) await this.store.deletePhoto(readingId, pending.shift()!.id);
+    const dims = (n: number) => (Number.isFinite(n) && n > 0 && n < 100_000 ? Math.round(n) : 0);
+    const photo = await this.store.createPhoto(
+      readingId,
+      { uploaderId: userId, contentType: file.contentType, width: dims(width), height: dims(height), createdAt: this.now() },
+      { name: `photo.${file.contentType.split('/')[1]}`, contentType: file.contentType, data: file.data },
+    );
+    return { id: photo.id, width: photo.width, height: photo.height };
+  }
+
+  /** Deletes a photo uploaded but finally not sent. */
+  async discardPhoto(userId: string, readingId: string, photoId: string): Promise<void> {
+    const entry = this.entry(readingId);
+    const photo = entry.photos.get(photoId);
+    if (!photo || photo.uploaderId !== userId || this.attachedPhotos(entry).has(photoId)) return;
+    await this.store.deletePhoto(readingId, photoId);
+  }
   async listEmojis(): Promise<CustomEmojiView[]> {
     const emojis = await this.deps.emojis();
     return [...emojis.values()]

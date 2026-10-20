@@ -1,4 +1,4 @@
-import type { Comment, Participant, Reading, UserPrefs } from '../domain/types';
+import type { Comment, Participant, Photo, Reading, UserPrefs } from '../domain/types';
 
 // Every record is one bot message: "JSL1 " followed by JSON. Users never see these channels.
 const PREFIX = 'JSL1 ';
@@ -8,6 +8,7 @@ export type StoredRecord =
   | { t: 'reading'; v: Omit<Reading, 'id'> }
   | { t: 'participant'; v: Participant }
   | { t: 'comment'; v: Omit<Comment, 'id'> }
+  | { t: 'photo'; v: Omit<Photo, 'id'> }
   | { t: 'user'; v: UserPrefs };
 
 export class RecordTooLargeError extends Error {
@@ -28,7 +29,7 @@ export function decode(content: string): StoredRecord | null {
   try {
     const parsed = JSON.parse(content.slice(PREFIX.length)) as StoredRecord;
     if (!parsed || typeof parsed !== 'object' || typeof parsed.v !== 'object' || parsed.v === null) return null;
-    if (!['reading', 'participant', 'comment', 'user'].includes(parsed.t)) return null;
+    if (!['reading', 'participant', 'comment', 'photo', 'user'].includes(parsed.t)) return null;
     return parsed;
   } catch {
     return null;

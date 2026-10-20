@@ -6,7 +6,7 @@ import type { DataStore } from '../store/data-store';
 
 export interface NotifyEvent {
   readingId: string;
-  kind: 'comment' | 'gif' | 'reaction' | 'reply';
+  kind: 'comment' | 'gif' | 'photo' | 'reaction' | 'reply';
   actorId: string;
   position: number;
   /** Comment excerpt, or the emoji for a reaction. */
@@ -43,6 +43,8 @@ function describe(event: NotifyEvent, actor: string, where: string, withExcerpt:
       return `${actor} a réagi ${event.excerpt} ${where}`;
     case 'gif':
       return `${actor} a posté un GIF ${where}`;
+    case 'photo':
+      return `${actor} a posté une photo ${where}`;
     case 'comment':
       return `${actor} a commenté ${where}${excerpt}`;
     case 'reply':

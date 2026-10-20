@@ -27,6 +27,7 @@ async function setup(discord = new FakeDiscord()) {
     store,
     members: async () => members(),
     emojis,
+    signPhoto: async (readingId, photoId) => `signed:${readingId}/${photoId}`,
     onEvent: (e) => events.push(e),
     now: () => clock++,
   });
@@ -206,6 +207,76 @@ describe('Service', () => {
     const out = buildNotifications(ctx.events, ctx.store, (id) => id, () => 'dm');
     const toAlice = out.find((o) => o.kind === 'dm' && o.userId === ALICE);
     expect(toAlice?.content).toContain('bruno t’a répondu au chapitre 9 : « oui »');
+  });
+
+  describe('photos', () => {
+    const jpeg = { data: new Uint8Array([1, 2, 3]), contentType: 'image/jpeg' };
+
+    it('attaches uploaded photos and only signs visible ones', async () => {
+      const book = await createBook(ctx.service);
+      await ctx.service.setProgress(ALICE, book.id, 10, null);
+      await ctx.service.setProgress(BRUNO, book.id, 5, null);
+      const a = await ctx.service.uploadPhoto(ALICE, book.id, jpeg, 800, 600);
+      const b = await ctx.service.uploadPhoto(ALICE, book.id, jpeg, 600, 800);
+      await ctx.service.addComment(ALICE, book.id, { position: 9, text: '', gif: null, photos: [a.id, b.id] });
+
+      const alice = await ctx.service.readingView(ALICE, book.id);
+      expect(alice.comments[0]?.photos).toEqual([a, b]);
+      expect(alice.photoUrls[a.id]).toBe(`signed:${book.id}/${a.id}`);
+      // Bruno is at 5: no comment, no photo link.
+      expect((await ctx.service.readingView(BRUNO, book.id)).photoUrls).toEqual({});
+      expect(ctx.events.at(-1)?.kind).toBe('photo');
+    });
+
+    it('refuses photos of others, reused ones and wrong files', async () => {
+      const book = await createBook(ctx.service);
+      await ctx.service.setProgress(ALICE, book.id, 3, null);
+      await ctx.service.setProgress(BRUNO, book.id, 3, null);
+      const mine = await ctx.service.uploadPhoto(ALICE, book.id, jpeg, 1, 1);
+      await expect(ctx.service.addComment(BRUNO, book.id, { position: 1, text: 'x', gif: null, photos: [mine.id] })).rejects.toThrow(
+        /introuvable/,
+      );
+      await ctx.service.addComment(ALICE, book.id, { position: 1, text: 'x', gif: null, photos: [mine.id] });
+      await expect(ctx.service.addComment(ALICE, book.id, { position: 1, text: 'y', gif: null, photos: [mine.id] })).rejects.toThrow(
+        /introuvable/,
+      );
+      await expect(ctx.service.uploadPhoto(ALICE, book.id, { ...jpeg, contentType: 'image/heic' }, 1, 1)).rejects.toThrow(/Format/);
+      await expect(
+        ctx.service.uploadPhoto(ALICE, book.id, { data: new Uint8Array(10 * 1024 * 1024 + 1), contentType: 'image/png' }, 1, 1),
+      ).rejects.toThrow(/lourde/);
+      const many = await Promise.all([1, 2, 3, 4, 5].map(() => ctx.service.uploadPhoto(ALICE, book.id, jpeg, 1, 1)));
+      await expect(
+        ctx.service.addComment(ALICE, book.id, { position: 1, text: 'x', gif: null, photos: many.map((p) => p.id) }),
+      ).rejects.toThrow(/4 photos/);
+    });
+
+    it('deletes photos removed by an edit or with their comment', async () => {
+      const book = await createBook(ctx.service);
+      await ctx.service.setProgress(ALICE, book.id, 3, null);
+      const a = await ctx.service.uploadPhoto(ALICE, book.id, jpeg, 1, 1);
+      const b = await ctx.service.uploadPhoto(ALICE, book.id, jpeg, 1, 1);
+      const c = await ctx.service.addComment(ALICE, book.id, { position: 2, text: 'x', gif: null, photos: [a.id, b.id] });
+      const photos = ctx.store.readings.get(book.id)!.photos;
+
+      await ctx.service.editComment(ALICE, book.id, c.id, 'x', undefined, [b.id]);
+      expect(photos.has(a.id)).toBe(false);
+      expect(ctx.store.readings.get(book.id)!.comments.get(c.id)?.photos).toEqual([b]);
+
+      await ctx.service.deleteComment(ALICE, book.id, c.id);
+      expect(photos.size).toBe(0);
+
+      // Photos survive a reload from Discord.
+      const d = await ctx.service.uploadPhoto(ALICE, book.id, jpeg, 4, 3);
+      await ctx.service.addComment(ALICE, book.id, { position: 2, text: '', gif: null, photos: [d.id] });
+      const reloaded = await setup(ctx.discord);
+      expect(reloaded.store.readings.get(book.id)!.photos.get(d.id)).toMatchObject({ width: 4, height: 3 });
+    });
+
+    it('cleans up forgotten uploads', async () => {
+      const book = await createBook(ctx.service);
+      for (let i = 0; i < 12; i++) await ctx.service.uploadPhoto(ALICE, book.id, jpeg, 1, 1);
+      expect(ctx.store.readings.get(book.id)!.photos.size).toBe(8);
+    });
   });
 
   it('converts a personal edition to the reference edition', async () => {

@@ -1,7 +1,7 @@
 // HTTP contract between the Worker and the Activity (imported by both).
-import type { Comment, Gif, JoinMode, NotifyPref, ProgressUnit } from './domain/types';
+import type { Comment, Gif, JoinMode, NotifyPref, PhotoRef, ProgressUnit } from './domain/types';
 
-export type { Comment, Gif, JoinMode, NotifyPref, ProgressUnit };
+export type { Comment, Gif, JoinMode, NotifyPref, PhotoRef, ProgressUnit };
 
 export interface MemberView {
   id: string;
@@ -57,6 +57,8 @@ export interface ReadingView {
   comments: Comment[];
   /** Display info for every user referenced in this view. */
   members: Record<string, MemberView>;
+  /** Signed links to the photos of the visible comments, by photo id. */
+  photoUrls: Record<string, string>;
 }
 
 export interface CreateReadingInput {

@@ -4,6 +4,8 @@ import { exchangeOAuthCode } from './discord/rest';
 import { verifyInteraction } from './discord/verify';
 import type { Env } from './env';
 import { searchGifs } from './gifs';
+import { MAX_PHOTO_BYTES } from './domain/limits';
+import { verifyPhotoLink } from './photo-links';
 import type { Op, OpResult } from './store-do';
 
 export { JensuislaStore } from './store-do';
@@ -83,6 +85,32 @@ async function serveCover(request: Request, env: Env, ctx: ExecutionContext, rea
   return response;
 }
 
+/** Serves a photo to whoever holds a valid signed link (handed out only to readers allowed to see it). */
+async function servePhoto(env: Env, ctx: ExecutionContext, url: URL, readingId: string, photoId: string): Promise<Response> {
+  const valid = await verifyPhotoLink(
+    env.DISCORD_CLIENT_SECRET,
+    readingId,
+    photoId,
+    url.searchParams.get('e'),
+    url.searchParams.get('s'),
+  );
+  if (!valid) return new Response('forbidden', { status: 403 });
+  // Cached by photo, not by link: links change every few hours, the file never does.
+  const cacheKey = new Request(`https://photos.jensuisla/${readingId}/${photoId}`);
+  const cached = await caches.default.match(cacheKey);
+  if (cached) return cached;
+  const source = await store(env).photoSource(readingId, photoId);
+  if (!source) return new Response('not found', { status: 404 });
+  const upstream = await fetch(source.url);
+  if (!upstream.ok) return new Response('not found', { status: 404 });
+  const response = new Response(upstream.body, {
+    // "public" so the edge cache keeps it; the signed URL already restricts who gets it.
+    headers: { 'Content-Type': source.contentType, 'Cache-Control': 'public, max-age=86400' },
+  });
+  ctx.waitUntil(caches.default.put(cacheKey, response.clone()));
+  return response;
+}
+
 /** Routes that need a signed-in user, mapped to store operations. */
 function toOp(method: string, parts: string[], data: Record<string, any>): Op | null {
   const [resource, id, sub, subId, subSub] = parts;
@@ -113,9 +141,11 @@ function toOp(method: string, parts: string[], data: Record<string, any>): Op | 
           text: String(data.text ?? ''),
           gif: data.gif ?? null,
           replyTo: typeof data.replyTo === 'string' ? data.replyTo : null,
+          photos: Array.isArray(data.photos) ? data.photos.map(String) : [],
         };
     }
   }
+  if (sub === 'photos' && subId && method === 'DELETE') return { op: 'discardPhoto', readingId: id, photoId: subId };
   if (sub === 'comments' && subId) {
     if (method === 'PATCH' && !subSub)
       return {
@@ -124,6 +154,7 @@ function toOp(method: string, parts: string[], data: Record<string, any>): Op | 
         commentId: subId,
         text: String(data.text ?? ''),
         gif: 'gif' in data ? (data.gif ?? null) : undefined,
+        photos: Array.isArray(data.photos) ? data.photos.map(String) : undefined,
       };
     if (method === 'DELETE' && !subSub) return { op: 'deleteComment', readingId: id, commentId: subId };
     if (method === 'POST' && subSub === 'reactions')
@@ -145,6 +176,7 @@ async function handleApi(request: Request, env: Env, ctx: ExecutionContext, url:
   }
   if (parts[0] === 'img' && method === 'GET') return proxyImage(url.searchParams.get('u'));
   if (parts[0] === 'cover' && parts[1] && method === 'GET') return serveCover(request, env, ctx, parts[1]);
+  if (parts[0] === 'photo' && parts[1] && parts[2] && method === 'GET') return servePhoto(env, ctx, url, parts[1], parts[2]);
 
   const token = request.headers.get('Authorization')?.replace(/^Bearer\s+/i, '');
   const userId = token ? await store(env).authenticate(token) : null;
@@ -164,6 +196,23 @@ async function handleApi(request: Request, env: Env, ctx: ExecutionContext, url:
   if (parts[0] === 'gifs' && method === 'GET') {
     if (!env.GIPHY_API_KEY) return fail(503, 'GIF non configurés');
     return json(await searchGifs(env.GIPHY_API_KEY, url.searchParams.get('q')?.trim() ?? ''));
+  }
+
+  // Photo upload: the raw file is the request body.
+  if (parts[0] === 'readings' && parts[1] && parts[2] === 'photos' && !parts[3] && method === 'POST') {
+    const size = Number(request.headers.get('Content-Length') ?? 0);
+    if (size > MAX_PHOTO_BYTES) return fail(413, 'Photo trop lourde (10 Mo maximum)');
+    const data = await request.arrayBuffer();
+    return fromResult(
+      await store(env).run(userId, {
+        op: 'uploadPhoto',
+        readingId: parts[1],
+        data,
+        contentType: (request.headers.get('Content-Type') ?? '').split(';')[0]!.trim(),
+        width: Number(url.searchParams.get('w')),
+        height: Number(url.searchParams.get('h')),
+      }),
+    );
   }
 
   const data = method === 'GET' || method === 'DELETE' ? {} : await body<Record<string, any>>(request);

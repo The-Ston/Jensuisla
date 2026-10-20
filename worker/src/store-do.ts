@@ -6,6 +6,7 @@ import type { Gif, NotifyPref } from './domain/types';
 import type { Env } from './env';
 import { buildNotifications, type NotifyEvent } from './service/notifications';
 import { DEFAULT_NOTIFY, HttpError, Service, type EmojiInfo, type MemberInfo } from './service/service';
+import { signPhotoLink } from './photo-links';
 import { RecordTooLargeError } from './store/codec';
 import { DataStore } from './store/data-store';
 
@@ -24,8 +25,25 @@ export type Op =
   | { op: 'progress'; readingId: string; value: number; editionTotal: number | null }
   | { op: 'undo'; readingId: string }
   | { op: 'visited'; readingId: string }
-  | { op: 'comment'; readingId: string; position: number; text: string; gif: Gif | null; replyTo: string | null }
-  | { op: 'editComment'; readingId: string; commentId: string; text: string; gif?: Gif | null }
+  | {
+      op: 'comment';
+      readingId: string;
+      position: number;
+      text: string;
+      gif: Gif | null;
+      replyTo: string | null;
+      photos: string[];
+    }
+  | { op: 'editComment'; readingId: string; commentId: string; text: string; gif?: Gif | null; photos?: string[] }
+  | {
+      op: 'uploadPhoto';
+      readingId: string;
+      data: ArrayBuffer;
+      contentType: string;
+      width: number;
+      height: number;
+    }
+  | { op: 'discardPhoto'; readingId: string; photoId: string }
   | { op: 'deleteComment'; readingId: string; commentId: string }
   | { op: 'react'; readingId: string; commentId: string; emoji: string }
   | { op: 'notify'; pref: NotifyPref }
@@ -67,6 +85,7 @@ export class JensuislaStore extends DurableObject<Env> {
           store,
           members: () => this.getMembers(),
           emojis: () => this.getEmojis(),
+          signPhoto: (readingId, photoId) => signPhotoLink(this.env.DISCORD_CLIENT_SECRET, readingId, photoId),
           onEvent: (e) => this.enqueueNotification(e),
         });
       })
@@ -165,8 +184,19 @@ export class JensuislaStore extends DurableObject<Env> {
         await s.addComment(userId, op.readingId, op);
         break;
       case 'editComment':
-        await s.editComment(userId, op.readingId, op.commentId, op.text, op.gif);
+        await s.editComment(userId, op.readingId, op.commentId, op.text, op.gif, op.photos);
         break;
+      case 'uploadPhoto':
+        return s.uploadPhoto(
+          userId,
+          op.readingId,
+          { data: new Uint8Array(op.data), contentType: op.contentType },
+          op.width,
+          op.height,
+        );
+      case 'discardPhoto':
+        await s.discardPhoto(userId, op.readingId, op.photoId);
+        return null;
       case 'deleteComment':
         await s.deleteComment(userId, op.readingId, op.commentId);
         break;
@@ -196,6 +226,17 @@ export class JensuislaStore extends DurableObject<Env> {
       if (!reading?.cover) return null;
       if (reading.cover.kind === 'url') return reading.cover.url;
       return this.store!.coverAttachmentUrl(readingId);
+    });
+  }
+
+  /** Where to fetch a photo file from (its link was already verified by the Worker). */
+  async photoSource(readingId: string, photoId: string): Promise<{ url: string; contentType: string } | null> {
+    return this.exclusive(async () => {
+      await this.getService();
+      const photo = this.store?.readings.get(readingId)?.photos.get(photoId);
+      if (!photo) return null;
+      const url = await this.store!.photoAttachmentUrl(readingId, photoId);
+      return url ? { url, contentType: photo.contentType } : null;
     });
   }
 

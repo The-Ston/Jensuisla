@@ -58,8 +58,27 @@ export interface Comment {
   reactions: Record<string, string[]>;
   /** Comment this one answers. Optional for records written before replies existed. */
   replyTo?: string | null;
+  /** Attached photos, in order. Optional for records written before photos existed. */
+  photos?: PhotoRef[];
   createdAt: number;
   editedAt: number | null;
+}
+
+/** A photo is stored alone in a hidden message (one file per message stays within Discord's limits). */
+export interface Photo {
+  /** Id of the Discord message holding the file. */
+  id: string;
+  uploaderId: string;
+  contentType: string;
+  width: number;
+  height: number;
+  createdAt: number;
+}
+
+export interface PhotoRef {
+  id: string;
+  width: number;
+  height: number;
 }
 
 export interface UserPrefs {

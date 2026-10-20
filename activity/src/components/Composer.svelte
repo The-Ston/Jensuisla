@@ -4,9 +4,11 @@
   import { img } from '../lib/format';
   import { fromDisplay, scaleLabel, toDisplay, type Scale } from '../lib/scale';
   import GifPicker from './GifPicker.svelte';
+  import PhotoAttach, { type AttachItem } from './PhotoAttach.svelte';
   import RichInput from './RichInput.svelte';
 
   let {
+    readingId,
     scale,
     max,
     position = $bindable(),
@@ -14,6 +16,7 @@
     replyAuthor = '',
     onSend,
   }: {
+    readingId: string;
     /** Positions are reference positions; the reader sees and types them in their own scale. */
     scale: Scale;
     /** Furthest position the reader may write at (their progress). */
@@ -22,8 +25,13 @@
     /** Comment being answered, if any. */
     replyTo: Comment | null;
     replyAuthor?: string;
-    onSend: (text: string, gif: Gif | null, position: number, replyTo: string | null) => Promise<void>;
+    onSend: (text: string, gif: Gif | null, position: number, replyTo: string | null, photos: string[]) => Promise<void>;
   } = $props();
+
+  let photos = $state<AttachItem[]>([]);
+  let attach: { open: () => void } | undefined = $state();
+  const photosBusy = $derived(photos.some((p) => p.uploading));
+  const photoIds = $derived(photos.filter((p) => p.ref && !p.error).map((p) => p.ref!.id));
 
   // A reply may not be placed before the message it answers (it would reveal it too early).
   const min = $derived(replyTo ? replyTo.position : 0);
@@ -73,15 +81,17 @@
   async function send(event: SubmitEvent) {
     event.preventDefault();
     text = input?.finalize() ?? text;
-    if (!text.trim() && !gif) return;
+    if (photosBusy) return (error = 'Patiente, les photos sont encore en cours d’envoi');
+    if (!text.trim() && !gif && photoIds.length === 0) return;
     if (text.length > 1000) return (error = 'Commentaire trop long (1000 caractères maximum)');
     sending = true;
     error = '';
     try {
-      await onSend(text, gif, Math.max(min, position), replyTo?.id ?? null);
+      await onSend(text, gif, Math.max(min, position), replyTo?.id ?? null, photoIds);
       text = '';
       gif = null;
       replyTo = null;
+      photos = [];
     } catch (e) {
       error = e instanceof Error ? e.message : 'Envoi impossible';
     } finally {
@@ -119,6 +129,8 @@
       <button type="button" class="btn small ghost" onclick={() => (gif = null)}>Retirer</button>
     </div>
   {/if}
+
+  <PhotoAttach {readingId} bind:items={photos} bind:this={attach} />
 
   {#if replyTo}
     <div class="replying">
@@ -166,10 +178,15 @@
       bind:this={input}
       onKeydown={onKey}
     />
+    <button type="button" class="btn icon-btn" title="Ajouter des photos (4 max)" aria-label="Ajouter des photos" onclick={() => attach?.open()}>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h3l2-3h6l2 3h3a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1Z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+    </button>
     <button type="button" class="btn gif-btn" class:on={picking} aria-pressed={picking} onclick={() => (picking = !picking)}>
       GIF
     </button>
-    <button class="btn primary" disabled={sending || (!text.trim() && !gif)}>Envoyer</button>
+    <button class="btn primary" disabled={sending || photosBusy || (!text.trim() && !gif && photoIds.length === 0)}>
+      {photosBusy ? 'Envoi…' : 'Envoyer'}
+    </button>
   </form>
   {#if error}<p class="error">{error}</p>{/if}
 </div>
@@ -251,6 +268,9 @@
   }
   .box :global(.rich) {
     align-self: center;
+  }
+  .icon-btn {
+    padding: 0 10px;
   }
   .gif-btn.on {
     border-color: var(--accent);

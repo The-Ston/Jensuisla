@@ -11,6 +11,8 @@
   import ReactionGlyph from './ReactionGlyph.svelte';
   import FavoriteStar from './FavoriteStar.svelte';
   import GifPicker from './GifPicker.svelte';
+  import PhotoAttach, { existingItems, type AttachItem } from './PhotoAttach.svelte';
+  import PhotoGrid from './PhotoGrid.svelte';
   import RichInput from './RichInput.svelte';
   import { renderPageRefs, splitPageRefs } from '$shared/domain/page-refs';
 
@@ -27,6 +29,8 @@
     onJumpToPosition,
     onReact,
     onReply,
+    readingId,
+    photoUrls,
     onEdit,
     onDelete,
   }: {
@@ -45,7 +49,9 @@
     onReact: (emoji: string) => Promise<void>;
     /** Prepares the composer to answer at this comment's position. */
     onReply: () => void;
-    onEdit: (text: string, gif: Gif | null) => Promise<void>;
+    readingId: string;
+    photoUrls: Record<string, string>;
+    onEdit: (text: string, gif: Gif | null, photos: string[]) => Promise<void>;
     onDelete: () => Promise<void>;
   } = $props();
 
@@ -95,9 +101,15 @@
     }
   }
 
+  let draftPhotos = $state<AttachItem[]>([]);
+  let attach: { open: () => void; discardNew: () => void } | undefined = $state();
+  const photosBusy = $derived(draftPhotos.some((p) => p.uploading));
+  const hasDraftPhotos = $derived(draftPhotos.some((p) => p.ref && !p.error));
+
   async function startEdit() {
     draft = comment.text;
     draftGif = comment.gif;
+    draftPhotos = existingItems(comment.photos ?? [], photoUrls);
     pickingGif = false;
     confirming = false;
     editing = true;
@@ -106,6 +118,8 @@
   }
 
   function cancelEdit() {
+    // Photos added during this edit were uploaded already: drop them.
+    attach?.discardNew();
     editing = false;
     pickingGif = false;
     error = '';
@@ -113,8 +127,10 @@
 
   async function saveEdit(event?: SubmitEvent) {
     event?.preventDefault();
+    if (photosBusy) return;
     draft = textarea?.finalize() ?? draft;
-    if (await run(() => onEdit(draft, draftGif))) editing = false;
+    const photos = draftPhotos.filter((p) => p.ref && !p.error).map((p) => p.ref!.id);
+    if (await run(() => onEdit(draft, draftGif, photos))) editing = false;
   }
 
   function onEditKey(event: KeyboardEvent) {
@@ -136,7 +152,7 @@
         <button class="quote-link" title="Aller au message d’origine" onclick={() => onJump(original.id)}>
           <Avatar member={members[original.authorId]} size={16} />
           <strong>{members[original.authorId]?.name ?? 'Ancien membre'}</strong>
-          <span class="excerpt">{renderPageRefs(original.text, pageLabel) || (original.gif ? 'GIF' : '')}</span>
+          <span class="excerpt">{renderPageRefs(original.text, pageLabel) || (original.photos?.length ? 'Photo' : original.gif ? 'GIF' : '')}</span>
         </button>
       {:else}
         <span class="muted deleted">Message supprimé</span>
@@ -181,19 +197,27 @@
             {:else}
               <button type="button" class="btn small" onclick={() => (pickingGif = true)}>Ajouter un GIF</button>
             {/if}
+            <button type="button" class="btn small" onclick={() => attach?.open()}>Ajouter des photos</button>
           </div>
         {/if}
+
+        <PhotoAttach {readingId} bind:items={draftPhotos} bind:this={attach} />
 
         <div class="row">
           <span class="muted hint">Échap pour annuler · Ctrl+Entrée pour enregistrer</span>
           <button type="button" class="btn small" onclick={cancelEdit}>Annuler</button>
-          <button class="btn small primary" disabled={busy || (!draft.trim() && !draftGif)}>Enregistrer</button>
+          <button class="btn small primary" disabled={busy || photosBusy || (!draft.trim() && !draftGif && !hasDraftPhotos)}>
+            Enregistrer
+          </button>
         </div>
       </form>
     {:else}
       {#if comment.text}
         <!-- Kept on one line: the paragraph preserves whitespace (pre-wrap). -->
         <p>{#each splitPageRefs(comment.text) as seg, i (i)}{#if seg.kind === 'text'}{seg.text}{:else if seg.position <= myProgress}<button class="page-ref" title="Aller à ce passage" onclick={() => onJumpToPosition(seg.position)}>{pageLabel(seg.position)}</button>{:else}<span class="page-ref locked" title="Tu n’y es pas encore">{pageLabel(seg.position)} 🔒</span>{/if}{/each}</p>
+      {/if}
+      {#if comment.photos?.length}
+        <PhotoGrid photos={comment.photos} urls={photoUrls} />
       {/if}
       {#if comment.gif}
         <div class="gif-box">
