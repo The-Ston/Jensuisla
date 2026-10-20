@@ -65,6 +65,14 @@ export interface CreateReadingInput {
   invitedIds: string[];
 }
 
+/** An emoji of the Discord server, usable as a reaction. */
+export interface CustomEmojiView {
+  /** Reaction key (`c:<id>:<name>`). */
+  key: string;
+  name: string;
+  url: string;
+}
+
 export interface BookSuggestion {
   title: string;
   author: string;

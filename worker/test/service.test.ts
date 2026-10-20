@@ -21,7 +21,15 @@ async function setup(discord = new FakeDiscord()) {
   const store = await DataStore.load(discord, { guildId: GUILD, botUserId: BOT });
   const events: NotifyEvent[] = [];
   let clock = 1000;
-  const service = new Service({ store, members: async () => members(), onEvent: (e) => events.push(e), now: () => clock++ });
+  const emojis = async () =>
+    new Map(discord.emojis.map((e) => [e.id, { id: e.id, name: e.name, animated: !!e.animated }]));
+  const service = new Service({
+    store,
+    members: async () => members(),
+    emojis,
+    onEvent: (e) => events.push(e),
+    now: () => clock++,
+  });
   return { discord, store, service, events };
 }
 
@@ -141,6 +149,40 @@ describe('Service', () => {
   it('fits the maximum number of favorites in one record', async () => {
     for (let i = 0; i < 70; i++) await ctx.service.toggleFavoriteGif(ALICE, `${'x'.repeat(20)}${i.toString().padStart(4, '0')}`);
     expect(ctx.service.favoriteGifs(ALICE)).toHaveLength(60);
+  });
+
+  it('accepts any standard emoji and only real server emojis', async () => {
+    ctx.discord.emojis = [{ id: '123456789', name: 'livre' }];
+    const book = await createBook(ctx.service);
+    await ctx.service.setProgress(ALICE, book.id, 2, null);
+    const c = await ctx.service.addComment(ALICE, book.id, { position: 1, text: 'x', gif: null });
+
+    for (const emoji of ['🥲', '👍🏽', '🇫🇷', '❤️', '1️⃣', '👨‍👩‍👧']) await ctx.service.toggleReaction(ALICE, book.id, c.id, emoji);
+    for (const bad of ['abc', '<b>', '12', '', '😂abc'])
+      await expect(ctx.service.toggleReaction(ALICE, book.id, c.id, bad)).rejects.toThrow(/inconnue/);
+
+    // The name sent by the client is replaced by the server's current name.
+    await ctx.service.toggleReaction(ALICE, book.id, c.id, 'c:123456789:oldname');
+    expect(ctx.store.readings.get(book.id)!.comments.get(c.id)!.reactions['c:123456789:livre']).toEqual([ALICE]);
+    await expect(ctx.service.toggleReaction(ALICE, book.id, c.id, 'c:999999999:nope')).rejects.toThrow(/plus sur le serveur/);
+
+    // Once deleted from the server, an emoji can still be removed but not added.
+    ctx.discord.emojis = [];
+    await ctx.service.toggleReaction(ALICE, book.id, c.id, 'c:123456789:livre');
+    expect(ctx.store.readings.get(book.id)!.comments.get(c.id)!.reactions['c:123456789:livre']).toBeUndefined();
+    expect((await ctx.service.listEmojis())).toEqual([]);
+  });
+
+  it('limits the number of distinct reactions on a comment', async () => {
+    const book = await createBook(ctx.service);
+    await ctx.service.setProgress(ALICE, book.id, 2, null);
+    const c = await ctx.service.addComment(ALICE, book.id, { position: 1, text: 'x', gif: null });
+    const faces = [...'😀😃😄😁😆😅🤣😂🙂🙃😉😊😇🥰😍🤩😘😗😚😙🥲'];
+    for (const f of faces.slice(0, 20)) await ctx.service.toggleReaction(ALICE, book.id, c.id, f);
+    await expect(ctx.service.toggleReaction(ALICE, book.id, c.id, faces[20]!)).rejects.toThrow(/Trop de réactions/);
+    // Removing one frees a slot for a new kind.
+    await ctx.service.toggleReaction(ALICE, book.id, c.id, faces[0]!);
+    await ctx.service.toggleReaction(ALICE, book.id, c.id, faces[20]!);
   });
 
   it('converts a personal edition to the reference edition', async () => {

@@ -6,6 +6,10 @@ export function avatarUrl(user: Pick<DiscordUser, 'id' | 'avatar'>): string {
   return `https://cdn.discordapp.com/embed/avatars/${index}.png`;
 }
 
+export function emojiUrl(id: string, animated: boolean): string {
+  return `https://cdn.discordapp.com/emojis/${id}.${animated ? 'gif' : 'png'}?size=48`;
+}
+
 /** External images go through the Worker: the Activity sandbox only allows its own origin. */
 export function proxied(url: string): string {
   return `/api/img?u=${encodeURIComponent(url)}`;

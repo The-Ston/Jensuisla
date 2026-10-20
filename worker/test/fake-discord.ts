@@ -3,6 +3,7 @@ import type {
   DiscordChannel,
   DiscordMessage,
   FileUpload,
+  GuildEmoji,
   GuildMember,
   MessageBody,
   PermissionOverwrite,
@@ -13,6 +14,7 @@ export class FakeDiscord implements DiscordApi {
   channels: (DiscordChannel & { overwrites?: PermissionOverwrite[] })[] = [];
   messages = new Map<string, DiscordMessage[]>();
   members: GuildMember[] = [];
+  emojis: GuildEmoji[] = [];
   calls = 0;
   private nextId = 1000n;
 
@@ -79,6 +81,11 @@ export class FakeDiscord implements DiscordApi {
   async listGuildMembers() {
     this.calls++;
     return this.members;
+  }
+
+  async listGuildEmojis() {
+    this.calls++;
+    return this.emojis;
   }
 
   async createDm(userId: string) {

@@ -1,5 +1,6 @@
 import type {
   CreateReadingInput,
+  CustomEmojiView,
   HomeView,
   MemberView,
   ReadingSummary,
@@ -14,8 +15,9 @@ import {
   MAX_FAVORITE_GIFS,
   MAX_TITLE_LENGTH,
   MAX_TOTAL,
-  REACTION_EMOJIS,
 } from '../domain/limits';
+import { customKey, isStandardEmoji, MAX_REACTION_KINDS, parseCustomKey } from '../domain/reactions';
+import { emojiUrl, proxied } from '../discord/cdn';
 import { applyProgress, clampPosition, newParticipant, toReference, undoProgress } from '../domain/progress';
 import type { Comment, Gif, JoinMode, NotifyPref, Participant, ProgressUnit, UserPrefs } from '../domain/types';
 import { gifFromId, GIPHY_ID } from '../gifs';
@@ -35,9 +37,17 @@ export interface MemberInfo extends MemberView {
   isOrganizer: boolean;
 }
 
+export interface EmojiInfo {
+  id: string;
+  name: string;
+  animated: boolean;
+}
+
 export interface ServiceDeps {
   store: DataStore;
   members: () => Promise<Map<string, MemberInfo>>;
+  /** Emojis of the Discord server, by id. */
+  emojis: () => Promise<Map<string, EmojiInfo>>;
   onEvent: (event: NotifyEvent) => void;
   now?: () => number;
 }
@@ -322,16 +332,31 @@ export class Service {
     await this.store.deleteComment(readingId, commentId);
   }
 
+  async listEmojis(): Promise<CustomEmojiView[]> {
+    const emojis = await this.deps.emojis();
+    return [...emojis.values()]
+      .map((e) => ({ key: customKey(e.id, e.name), name: e.name, url: proxied(emojiUrl(e.id, e.animated)) }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  /** `emoji` is a reaction key: a standard emoji, or `c:<id>:<name>` for a server emoji. */
   async toggleReaction(userId: string, readingId: string, commentId: string, emoji: string): Promise<void> {
-    if (!(REACTION_EMOJIS as readonly string[]).includes(emoji)) throw new HttpError(400, 'Réaction inconnue');
+    const custom = parseCustomKey(emoji);
+    if (!custom && !isStandardEmoji(emoji)) throw new HttpError(400, 'Réaction inconnue');
+    const known = custom ? (await this.deps.emojis()).get(custom.id) : undefined;
+    // Server emojis use their current name; a deleted one keeps its key so it can still be removed.
+    const key = known ? customKey(known.id, known.name) : emoji;
     const entry = this.entry(readingId);
     const comment = this.visibleComment(entry, userId, commentId);
-    const users = comment.reactions[emoji] ?? [];
+    const users = comment.reactions[key] ?? [];
     const adding = !users.includes(userId);
+    if (adding && custom && !known) throw new HttpError(400, "Cet emoji n'existe plus sur le serveur");
     const reactions = { ...comment.reactions };
     const next = adding ? [...users, userId] : users.filter((id) => id !== userId);
-    if (next.length) reactions[emoji] = next;
-    else delete reactions[emoji];
+    if (next.length) reactions[key] = next;
+    else delete reactions[key];
+    if (adding && !comment.reactions[key] && Object.keys(reactions).length > MAX_REACTION_KINDS)
+      throw new HttpError(400, 'Trop de réactions différentes sur ce commentaire');
     await this.store.saveComment(readingId, { ...comment, reactions });
     if (adding && comment.authorId !== userId) {
       this.deps.onEvent({
@@ -339,7 +364,7 @@ export class Service {
         kind: 'reaction',
         actorId: userId,
         position: comment.position,
-        excerpt: emoji,
+        excerpt: known ? `:${known.name}:` : key,
       });
     }
   }

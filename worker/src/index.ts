@@ -84,6 +84,7 @@ function toOp(method: string, parts: string[], data: Record<string, any>): Op | 
   const [resource, id, sub, subId, subSub] = parts;
   if (resource === 'home' && method === 'GET') return { op: 'home' };
   if (resource === 'members' && method === 'GET') return { op: 'members' };
+  if (resource === 'emojis' && method === 'GET') return { op: 'emojis' };
   if (resource === 'me' && id === 'notify' && method === 'PUT') return { op: 'notify', pref: data.pref };
   if (resource !== 'readings') return null;
   if (!id) return method === 'POST' ? { op: 'create', input: data as any } : null;

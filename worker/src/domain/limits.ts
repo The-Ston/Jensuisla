@@ -7,5 +7,5 @@ export const MAX_COVER_BYTES = 2 * 1024 * 1024;
 /** Favorites are stored as Giphy ids in the user's record, which must fit in one message. */
 export const MAX_FAVORITE_GIFS = 60;
 
-/** Reactions offered in the Activity. Restricting the set keeps stored messages small. */
+/** Reactions offered first in the Activity; any standard or server emoji is accepted. */
 export const REACTION_EMOJIS = ['❤️', '😂', '😮', '😢', '😡', '👍', '🔥', '🤯'] as const;

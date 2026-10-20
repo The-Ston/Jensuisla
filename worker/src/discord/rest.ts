@@ -3,6 +3,7 @@ import type {
   DiscordChannel,
   DiscordMessage,
   FileUpload,
+  GuildEmoji,
   GuildMember,
   MessageBody,
   PermissionOverwrite,
@@ -93,6 +94,10 @@ export class DiscordRest implements DiscordApi {
       if (page.length < 1000) return all;
       after = page[page.length - 1]!.user.id;
     }
+  }
+
+  listGuildEmojis(guildId: string) {
+    return this.request<GuildEmoji[]>('GET', `/guilds/${guildId}/emojis`);
   }
 
   createDm(userId: string) {

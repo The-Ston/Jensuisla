@@ -2,8 +2,12 @@
   import { tick } from 'svelte';
   import type { Comment, Gif, MemberView, ProgressUnit } from '$shared/api-types';
   import { REACTION_EMOJIS } from '$shared/domain/limits';
+  import { parseCustomKey } from '$shared/domain/reactions';
+  import { emojis } from '../lib/emojis.svelte';
   import { img, positionText, timeAgo } from '../lib/format';
   import Avatar from './Avatar.svelte';
+  import EmojiPicker from './EmojiPicker.svelte';
+  import ReactionGlyph from './ReactionGlyph.svelte';
   import FavoriteStar from './FavoriteStar.svelte';
   import GifPicker from './GifPicker.svelte';
 
@@ -46,6 +50,18 @@
   const reactions = $derived(Object.entries(comment.reactions).filter(([, ids]) => ids.length > 0));
 
   const names = (ids: string[]) => ids.map((id) => members[id]?.name ?? '?').join(', ');
+  const emojiLabel = (key: string) => {
+    const custom = parseCustomKey(key);
+    return custom ? `:${custom.name}:` : key;
+  };
+
+  let pickingAll = $state(false);
+
+  async function react(key: string) {
+    picking = false;
+    emojis.remember(key);
+    await run(() => onReact(key));
+  }
 
   async function run(action: () => Promise<void>) {
     busy = true;
@@ -164,9 +180,9 @@
             class:mine={ids.includes(meId)}
             title={names(ids)}
             aria-pressed={ids.includes(meId)}
-            aria-label="{emoji} {ids.length} : {names(ids)}"
+            aria-label="{emojiLabel(emoji)} {ids.length} : {names(ids)}"
             disabled={busy}
-            onclick={() => run(() => onReact(emoji))}>{emoji} {ids.length}</button
+            onclick={() => react(emoji)}><ReactionGlyph emojiKey={emoji} size={16} /> {ids.length}</button
           >
         {/each}
         <button class="pill add" aria-label="Ajouter une réaction" aria-expanded={picking} onclick={() => (picking = !picking)}>
@@ -174,17 +190,27 @@
         </button>
       </div>
 
-      {#if picking}
+      {#if pickingAll}
+        <EmojiPicker
+          onPick={(key) => {
+            pickingAll = false;
+            void react(key);
+          }}
+          onClose={() => (pickingAll = false)}
+        />
+      {:else if picking}
         <div class="picker" role="group" aria-label="Choisir une réaction">
           {#each REACTION_EMOJIS as emoji (emoji)}
-            <button
-              disabled={busy}
-              onclick={async () => {
-                picking = false;
-                await run(() => onReact(emoji));
-              }}>{emoji}</button
-            >
+            <button disabled={busy} onclick={() => react(emoji)}>{emoji}</button>
           {/each}
+          <button
+            class="more"
+            title="Tous les emoji"
+            onclick={() => {
+              picking = false;
+              pickingAll = true;
+            }}>Plus…</button
+          >
         </div>
       {/if}
 
@@ -313,6 +339,17 @@
   }
   .picker button:hover {
     background: var(--border-strong);
+  }
+  .picker .more {
+    width: auto;
+    padding: 0 10px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
   }
   .edit {
     display: flex;

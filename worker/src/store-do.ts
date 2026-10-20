@@ -5,7 +5,8 @@ import { DiscordRest, fetchOAuthUser } from './discord/rest';
 import type { Gif, NotifyPref } from './domain/types';
 import type { Env } from './env';
 import { buildNotifications, type NotifyEvent } from './service/notifications';
-import { DEFAULT_NOTIFY, HttpError, Service, type MemberInfo } from './service/service';
+import { DEFAULT_NOTIFY, HttpError, Service, type EmojiInfo, type MemberInfo } from './service/service';
+import { RecordTooLargeError } from './store/codec';
 import { DataStore } from './store/data-store';
 
 const MEMBERS_TTL_MS = 5 * 60_000;
@@ -28,6 +29,7 @@ export type Op =
   | { op: 'deleteComment'; readingId: string; commentId: string }
   | { op: 'react'; readingId: string; commentId: string; emoji: string }
   | { op: 'notify'; pref: NotifyPref }
+  | { op: 'emojis' }
   | { op: 'favorites' }
   | { op: 'toggleFavorite'; gifId: string };
 
@@ -44,6 +46,7 @@ export class JensuislaStore extends DurableObject<Env> {
   private store: DataStore | null = null;
   private queue: Promise<unknown> = Promise.resolve();
   private members: { at: number; map: Map<string, MemberInfo> } | null = null;
+  private emojis: { at: number; map: Map<string, EmojiInfo> } | null = null;
   private tokens = new Map<string, { userId: string; at: number }>();
   private dmChannels = new Map<string, string>();
   private pending: NotifyEvent[] = [];
@@ -63,6 +66,7 @@ export class JensuislaStore extends DurableObject<Env> {
         return new Service({
           store,
           members: () => this.getMembers(),
+          emojis: () => this.getEmojis(),
           onEvent: (e) => this.enqueueNotification(e),
         });
       })
@@ -90,6 +94,18 @@ export class JensuislaStore extends DurableObject<Env> {
     return map;
   }
 
+  private async getEmojis(): Promise<Map<string, EmojiInfo>> {
+    if (this.emojis && Date.now() - this.emojis.at < MEMBERS_TTL_MS) return this.emojis.map;
+    const list = await this.api.listGuildEmojis(this.env.DISCORD_GUILD_ID);
+    const map = new Map<string, EmojiInfo>();
+    for (const e of list) {
+      if (e.available === false) continue;
+      map.set(e.id, { id: e.id, name: e.name, animated: !!e.animated });
+    }
+    this.emojis = { at: Date.now(), map };
+    return map;
+  }
+
   private exclusive<T>(fn: () => Promise<T>): Promise<T> {
     const run = this.queue.then(fn, fn);
     this.queue = run.catch(() => undefined);
@@ -112,6 +128,8 @@ export class JensuislaStore extends DurableObject<Env> {
         return { ok: true, data: await this.dispatch(await this.getService(), userId, op) };
       } catch (err) {
         if (err instanceof HttpError) return { ok: false, status: err.status, error: err.message };
+        if (err instanceof RecordTooLargeError)
+          return { ok: false, status: 400, error: 'Trop long pour être enregistré : raccourcis le message' };
         console.error('operation failed', op.op, err);
         return { ok: false, status: 502, error: 'Erreur en parlant à Discord, réessaie dans un instant' };
       }
@@ -158,6 +176,8 @@ export class JensuislaStore extends DurableObject<Env> {
       case 'notify':
         await s.setNotify(userId, op.pref);
         return null;
+      case 'emojis':
+        return s.listEmojis();
       case 'favorites':
         return s.favoriteGifs(userId);
       case 'toggleFavorite':

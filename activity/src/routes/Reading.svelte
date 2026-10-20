@@ -7,6 +7,7 @@
   import ProgressPanel from '../components/ProgressPanel.svelte';
   import Timeline from '../components/Timeline.svelte';
   import { api } from '../lib/api';
+  import { emojis } from '../lib/emojis.svelte';
   import { positionText } from '../lib/format';
   import { buildPoints } from '../lib/timeline';
 
@@ -78,6 +79,8 @@
 
   onMount(() => {
     void load(true);
+    // Server emojis are needed to display existing reactions.
+    void emojis.loadCustom();
     timer = setInterval(() => {
       if (!document.hidden) void load();
     }, REFRESH_MS);

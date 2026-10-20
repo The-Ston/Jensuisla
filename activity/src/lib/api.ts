@@ -1,6 +1,7 @@
 import type {
   BookSuggestion,
   CreateReadingInput,
+  CustomEmojiView,
   Gif,
   HomeView,
   MemberView,
@@ -38,6 +39,7 @@ const r = (id: string) => `/readings/${encodeURIComponent(id)}`;
 export const api = {
   home: () => call<HomeView>('GET', '/home'),
   members: () => call<MemberView[]>('GET', '/members'),
+  emojis: () => call<CustomEmojiView[]>('GET', '/emojis'),
   books: (q: string) => call<BookSuggestion[]>('GET', `/books?q=${encodeURIComponent(q)}`),
   gifs: (q: string) => call<Gif[]>('GET', `/gifs?q=${encodeURIComponent(q)}`),
   favoriteGifs: () => call<Gif[]>('GET', '/gifs/favorites'),

@@ -35,6 +35,13 @@ export interface DiscordMessage {
   attachments: DiscordAttachment[];
 }
 
+export interface GuildEmoji {
+  id: string;
+  name: string;
+  animated?: boolean;
+  available?: boolean;
+}
+
 export interface PermissionOverwrite {
   id: string;
   /** 0 = role, 1 = member */
@@ -68,6 +75,7 @@ export interface DiscordApi {
   editMessage(channelId: string, messageId: string, body: MessageBody): Promise<DiscordMessage>;
   deleteMessage(channelId: string, messageId: string): Promise<void>;
   listGuildMembers(guildId: string): Promise<GuildMember[]>;
+  listGuildEmojis(guildId: string): Promise<GuildEmoji[]>;
   createDm(userId: string): Promise<DiscordChannel>;
 }
 
