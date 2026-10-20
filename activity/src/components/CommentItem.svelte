@@ -11,6 +11,8 @@
   import ReactionGlyph from './ReactionGlyph.svelte';
   import FavoriteStar from './FavoriteStar.svelte';
   import GifPicker from './GifPicker.svelte';
+  import RichInput from './RichInput.svelte';
+  import { renderPageRefs, splitPageRefs } from '$shared/domain/page-refs';
 
   let {
     comment,
@@ -20,7 +22,9 @@
     canModerate,
     original,
     highlighted = false,
+    myProgress,
     onJump,
+    onJumpToPosition,
     onReact,
     onReply,
     onEdit,
@@ -34,7 +38,10 @@
     /** The comment this one replies to: undefined if not a reply, null if it was deleted. */
     original: Comment | null | undefined;
     highlighted?: boolean;
+    /** The reader's progress: page mentions beyond it are not clickable. */
+    myProgress: number;
     onJump: (commentId: string) => void;
+    onJumpToPosition: (position: number) => void;
     onReact: (emoji: string) => Promise<void>;
     /** Prepares the composer to answer at this comment's position. */
     onReply: () => void;
@@ -51,7 +58,10 @@
   let error = $state('');
   // Inline confirmation: browser dialogs may be blocked inside the Activity iframe.
   let confirming = $state(false);
-  let textarea: HTMLTextAreaElement | undefined = $state();
+  let textarea: { focus: () => void; finalize: () => string } | undefined = $state();
+
+  /** "p. 25" in the reader's edition ("p. ≈ 34" when converted). */
+  const pageLabel = (position: number) => scaleLabel(scale, position).replace(/^Page /, 'p. ');
 
   const author = $derived(members[comment.authorId]);
   const mine = $derived(comment.authorId === meId);
@@ -103,6 +113,7 @@
 
   async function saveEdit(event?: SubmitEvent) {
     event?.preventDefault();
+    draft = textarea?.finalize() ?? draft;
     if (await run(() => onEdit(draft, draftGif))) editing = false;
   }
 
@@ -125,7 +136,7 @@
         <button class="quote-link" title="Aller au message d’origine" onclick={() => onJump(original.id)}>
           <Avatar member={members[original.authorId]} size={16} />
           <strong>{members[original.authorId]?.name ?? 'Ancien membre'}</strong>
-          <span class="excerpt">{original.text || (original.gif ? 'GIF' : '')}</span>
+          <span class="excerpt">{renderPageRefs(original.text, pageLabel) || (original.gif ? 'GIF' : '')}</span>
         </button>
       {:else}
         <span class="muted deleted">Message supprimé</span>
@@ -141,17 +152,17 @@
 
     {#if editing}
       <form class="edit" onsubmit={saveEdit}>
-        <label class="sr-only" for="edit-{comment.id}">Modifier le commentaire</label>
-        <textarea
-          id="edit-{comment.id}"
-          class="input"
-          rows="3"
-          maxlength="1000"
-          placeholder="Texte du commentaire"
-          bind:value={draft}
-          bind:this={textarea}
-          onkeydown={onEditKey}
-        ></textarea>
+        <div class="edit-box">
+          <RichInput
+            id="edit-{comment.id}"
+            label="Modifier le commentaire"
+            placeholder="Texte du commentaire"
+            {scale}
+            bind:value={draft}
+            bind:this={textarea}
+            onKeydown={onEditKey}
+          />
+        </div>
 
         {#if pickingGif}
           <GifPicker
@@ -180,7 +191,10 @@
         </div>
       </form>
     {:else}
-      {#if comment.text}<p>{comment.text}</p>{/if}
+      {#if comment.text}
+        <!-- Kept on one line: the paragraph preserves whitespace (pre-wrap). -->
+        <p>{#each splitPageRefs(comment.text) as seg, i (i)}{#if seg.kind === 'text'}{seg.text}{:else if seg.position <= myProgress}<button class="page-ref" title="Aller à ce passage" onclick={() => onJumpToPosition(seg.position)}>{pageLabel(seg.position)}</button>{:else}<span class="page-ref locked" title="Tu n’y es pas encore">{pageLabel(seg.position)} 🔒</span>{/if}{/each}</p>
+      {/if}
       {#if comment.gif}
         <div class="gif-box">
           <img
@@ -441,6 +455,34 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+  }
+  .edit-box {
+    display: flex;
+    padding: 4px 8px;
+    border-radius: 8px;
+    border: 1px solid var(--border-strong);
+    background: var(--bg);
+    min-height: 72px;
+  }
+  .page-ref {
+    display: inline;
+    padding: 0 6px;
+    margin: 0 1px;
+    border-radius: 6px;
+    border: 1px solid var(--me);
+    background: rgba(106, 169, 255, 0.15);
+    color: var(--me);
+    font: inherit;
+    font-weight: 600;
+    font-size: 0.92em;
+  }
+  button.page-ref:hover {
+    background: rgba(106, 169, 255, 0.3);
+  }
+  .page-ref.locked {
+    border-color: var(--border-strong);
+    background: var(--surface-2);
+    color: var(--muted);
   }
   .gif-edit {
     display: flex;

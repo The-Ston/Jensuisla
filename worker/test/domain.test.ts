@@ -3,6 +3,7 @@ import { canSee, canWriteAt, visibleComments } from '../src/domain/access';
 import { groupIntoPoints, pointWindow } from '../src/domain/points';
 import { applyProgress, fromReference, newParticipant, toReference, undoProgress } from '../src/domain/progress';
 import { decode, encode, RecordTooLargeError } from '../src/store/codec';
+import { renderPageRefs, sanitizePageRefs, splitPageRefs } from '../src/domain/page-refs';
 import type { Comment } from '../src/domain/types';
 
 const comment = (id: string, position: number, createdAt = 0): Comment => ({
@@ -72,6 +73,24 @@ describe('timeline points', () => {
       w,
     );
     expect(pts.map((p) => [p.start, p.end])).toEqual([[12, 12], [88, 95], [121, 121]]);
+  });
+});
+
+describe('page mentions', () => {
+  it('splits text around page tokens', () => {
+    expect(splitPageRefs('vu [[p:25]] et [[p:30]].')).toEqual([
+      { kind: 'text', text: 'vu ' },
+      { kind: 'page', position: 25 },
+      { kind: 'text', text: ' et ' },
+      { kind: 'page', position: 30 },
+      { kind: 'text', text: '.' },
+    ]);
+    expect(renderPageRefs('la [[p:25]] !', (p) => `p. ${p + 1}`)).toBe('la p. 26 !');
+  });
+
+  it('only keeps valid tokens', () => {
+    expect(sanitizePageRefs('[[p:25]] [[p:999]]', 'page', 352)).toBe('[[p:25]] p. 999');
+    expect(sanitizePageRefs('[[p:3]]', 'chapter', 22)).toBe('p. 3');
   });
 });
 

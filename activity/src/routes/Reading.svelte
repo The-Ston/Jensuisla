@@ -166,6 +166,18 @@
     composer?.focus();
   }
 
+  /** Follows a page mention: selects the timeline point closest to that page. */
+  async function jumpToPosition(position: number) {
+    if (position > myProgress) return;
+    const containing = points.find((p) => p.start <= position && position <= p.end);
+    const closest =
+      containing ??
+      [...points].sort((a, b) => Math.abs(a.start - position) - Math.abs(b.start - position))[0];
+    select(closest ? closest.start : 'here');
+    await tick();
+    document.querySelector('.thread')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }
+
   /** Shows the original of a reply: selects its point, scrolls to it and flashes it. */
   async function jumpTo(commentId: string) {
     const point = points.find((p) => p.comments.some((c) => c.id === commentId));
@@ -289,6 +301,8 @@
               original={originalOf(comment)}
               highlighted={highlightedId === comment.id}
               onJump={jumpTo}
+              {myProgress}
+              onJumpToPosition={jumpToPosition}
               onReply={() => replyTo(comment)}
               onEdit={(text, gif) => mutate(() => api.editComment(id, comment.id, text, gif))}
               onDelete={() => mutate(() => api.deleteComment(id, comment.id))}

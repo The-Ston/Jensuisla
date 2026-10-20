@@ -4,6 +4,7 @@
   import { img } from '../lib/format';
   import { fromDisplay, scaleLabel, toDisplay, type Scale } from '../lib/scale';
   import GifPicker from './GifPicker.svelte';
+  import RichInput from './RichInput.svelte';
 
   let {
     scale,
@@ -32,14 +33,15 @@
   let sending = $state(false);
   let error = $state('');
   let picking = $state(false);
-  let textarea: HTMLTextAreaElement | undefined = $state();
+  let input: { focus: () => void; finalize: () => string } | undefined = $state();
+  let form: HTMLFormElement | undefined = $state();
 
   let editingPosition = $state(false);
   let positionDraft = $state(0);
   let positionInput: HTMLInputElement | undefined = $state();
 
   export function focus() {
-    textarea?.focus();
+    input?.focus();
   }
 
   async function openPosition() {
@@ -54,7 +56,7 @@
     if (Number.isFinite(positionDraft))
       position = Math.max(min, Math.min(max, fromDisplay(scale, Math.round(positionDraft))));
     editingPosition = false;
-    textarea?.focus();
+    input?.focus();
   }
 
   function onPositionKey(event: KeyboardEvent) {
@@ -64,13 +66,15 @@
     } else if (event.key === 'Escape') {
       event.preventDefault();
       editingPosition = false;
-      textarea?.focus();
+      input?.focus();
     }
   }
 
   async function send(event: SubmitEvent) {
     event.preventDefault();
+    text = input?.finalize() ?? text;
     if (!text.trim() && !gif) return;
+    if (text.length > 1000) return (error = 'Commentaire trop long (1000 caractères maximum)');
     sending = true;
     error = '';
     try {
@@ -88,7 +92,7 @@
   function onKey(event: KeyboardEvent) {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
-      (event.currentTarget as HTMLTextAreaElement).form?.requestSubmit();
+      form?.requestSubmit();
     } else if (event.key === 'Escape' && replyTo) {
       event.preventDefault();
       replyTo = null;
@@ -102,7 +106,7 @@
       onPick={(g) => {
         gif = g;
         picking = false;
-        textarea?.focus();
+        input?.focus();
       }}
       onClose={() => (picking = false)}
     />
@@ -123,7 +127,7 @@
     </div>
   {/if}
 
-  <form class="box" class:with-reply={!!replyTo} onsubmit={send}>
+  <form class="box" class:with-reply={!!replyTo} onsubmit={send} bind:this={form}>
     <div class="anchor">
       {#if editingPosition}
         <label class="sr-only" for="comment-position">
@@ -153,16 +157,15 @@
         </button>
       {/if}
     </div>
-    <label class="sr-only" for="comment-text">Commentaire</label>
-    <textarea
+    <RichInput
       id="comment-text"
-      rows="1"
-      maxlength="1000"
-      placeholder="Écrire un commentaire…"
+      label="Commentaire"
+      placeholder={scale.unit === 'page' ? 'Écrire un commentaire… (p.25 devient une page cliquable)' : 'Écrire un commentaire…'}
+      {scale}
       bind:value={text}
-      bind:this={textarea}
-      onkeydown={onKey}
-    ></textarea>
+      bind:this={input}
+      onKeydown={onKey}
+    />
     <button type="button" class="btn gif-btn" class:on={picking} aria-pressed={picking} onclick={() => (picking = !picking)}>
       GIF
     </button>
@@ -246,19 +249,8 @@
     border: 1px solid var(--me);
     background: var(--surface);
   }
-  textarea {
-    flex: 1;
-    min-width: 0;
-    min-height: 32px;
-    max-height: 160px;
-    padding: 6px 4px;
-    border: 0;
-    background: transparent;
-    resize: none;
+  .box :global(.rich) {
     align-self: center;
-  }
-  textarea:focus-visible {
-    outline: none;
   }
   .gif-btn.on {
     border-color: var(--accent);
@@ -280,7 +272,7 @@
     .box {
       flex-wrap: wrap;
     }
-    textarea {
+    .box :global(.rich) {
       flex-basis: 100%;
       order: -1;
     }

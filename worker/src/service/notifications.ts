@@ -1,4 +1,5 @@
 import { canSee } from '../domain/access';
+import { renderPageRefs } from '../domain/page-refs';
 import { fromReference } from '../domain/progress';
 import type { NotifyPref, ProgressUnit } from '../domain/types';
 import type { DataStore } from '../store/data-store';
@@ -83,9 +84,12 @@ export function buildNotifications(
       const relevant = readingEvents.filter((e) => e.actorId !== p.userId && canSee(e.position, p.progress));
       if (relevant.length === 0) continue;
       if (pref === 'dm') {
+        const approx = !!p.editionTotal && p.editionTotal !== total;
+        // Page mentions in excerpts are shown in the recipient's edition.
+        const pages = (pos: number) => `p. ${approx ? '≈ ' : ''}${fromReference(pos, p.editionTotal, total)}`;
         const lines = relevant.map((e) =>
           describe(
-            e,
+            { ...e, excerpt: renderPageRefs(e.excerpt, pages) },
             nameOf(e.actorId),
             positionLabel(unit, fromReference(e.position, p.editionTotal, total), !!p.editionTotal && p.editionTotal !== total),
             true,

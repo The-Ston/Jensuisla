@@ -10,7 +10,7 @@
     "build": "npm run build -w activity",
     "dev:activity": "npm run dev -w activity",
     "dev:worker": "npm run dev -w worker",
-    "test": "npm test -w worker",
+    "test": "npm test -w worker && npm test -w activity",
     "check": "npm run check -w activity && npm run check -w worker",
     "deploy": "npm run build && npm run deploy -w worker"
   },

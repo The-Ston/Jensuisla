@@ -16,6 +16,7 @@ import {
   MAX_TITLE_LENGTH,
   MAX_TOTAL,
 } from '../domain/limits';
+import { sanitizePageRefs } from '../domain/page-refs';
 import { customKey, isStandardEmoji, MAX_REACTION_KINDS, parseCustomKey } from '../domain/reactions';
 import { emojiUrl, proxied } from '../discord/cdn';
 import {
@@ -277,7 +278,7 @@ export class Service {
     const me = this.participant(entry, userId);
     if (!canWriteAt(entry.reading, input.position, me.progress))
       throw new HttpError(400, 'Tu ne peux commenter que ce que tu as déjà lu');
-    const text = (input.text ?? '').trim();
+    const text = sanitizePageRefs((input.text ?? '').trim(), entry.reading.unit, entry.reading.total);
     const gif = this.validGif(input.gif);
     if (!text && !gif) throw new HttpError(400, 'Commentaire vide');
     if (text.length > MAX_COMMENT_LENGTH) throw new HttpError(400, 'Commentaire trop long');
@@ -303,7 +304,8 @@ export class Service {
       kind: original ? 'reply' : gif && !text ? 'gif' : 'comment',
       actorId: userId,
       position: comment.position,
-      excerpt: text.slice(0, 120),
+      // Never cut a page token in half: it would show up raw in the notification.
+      excerpt: text.slice(0, 120).replace(/\[\[p?:?\d*\]?$/, ''),
       targetAuthorId: original?.authorId,
     });
     return comment;
@@ -341,7 +343,7 @@ export class Service {
     const entry = this.entry(readingId);
     const comment = this.visibleComment(entry, userId, commentId);
     if (comment.authorId !== userId) throw new HttpError(403, "Ce n'est pas ton commentaire");
-    const trimmed = (text ?? '').trim();
+    const trimmed = sanitizePageRefs((text ?? '').trim(), entry.reading.unit, entry.reading.total);
     const nextGif = gif === undefined ? comment.gif : this.validGif(gif);
     if ((!trimmed && !nextGif) || trimmed.length > MAX_COMMENT_LENGTH) throw new HttpError(400, 'Commentaire invalide');
     await this.store.saveComment(readingId, { ...comment, text: trimmed, gif: nextGif, editedAt: this.now() });
