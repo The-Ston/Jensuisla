@@ -40,6 +40,8 @@ export const api = {
   members: () => call<MemberView[]>('GET', '/members'),
   books: (q: string) => call<BookSuggestion[]>('GET', `/books?q=${encodeURIComponent(q)}`),
   gifs: (q: string) => call<Gif[]>('GET', `/gifs?q=${encodeURIComponent(q)}`),
+  favoriteGifs: () => call<Gif[]>('GET', '/gifs/favorites'),
+  toggleFavoriteGif: (gifId: string) => call<Gif[]>('POST', '/gifs/favorites', { id: gifId }),
   setNotify: (pref: NotifyPref) => call<null>('PUT', '/me/notify', { pref }),
   create: (input: CreateReadingInput) => call<ReadingSummary>('POST', '/readings', input),
   reading: (id: string) => call<ReadingView>('GET', r(id)),

@@ -27,7 +27,9 @@ export type Op =
   | { op: 'editComment'; readingId: string; commentId: string; text: string; gif?: Gif | null }
   | { op: 'deleteComment'; readingId: string; commentId: string }
   | { op: 'react'; readingId: string; commentId: string; emoji: string }
-  | { op: 'notify'; pref: NotifyPref };
+  | { op: 'notify'; pref: NotifyPref }
+  | { op: 'favorites' }
+  | { op: 'toggleFavorite'; gifId: string };
 
 export type OpResult = { ok: true; data: unknown } | { ok: false; status: number; error: string };
 
@@ -156,6 +158,10 @@ export class JensuislaStore extends DurableObject<Env> {
       case 'notify':
         await s.setNotify(userId, op.pref);
         return null;
+      case 'favorites':
+        return s.favoriteGifs(userId);
+      case 'toggleFavorite':
+        return s.toggleFavoriteGif(userId, op.gifId);
     }
     // Mutations on a reading answer with the refreshed view.
     if (!('readingId' in op)) return null;

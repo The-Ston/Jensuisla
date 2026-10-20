@@ -11,12 +11,14 @@ import {
   MAX_AUTHOR_LENGTH,
   MAX_COMMENT_LENGTH,
   MAX_COVER_BYTES,
+  MAX_FAVORITE_GIFS,
   MAX_TITLE_LENGTH,
   MAX_TOTAL,
   REACTION_EMOJIS,
 } from '../domain/limits';
 import { applyProgress, clampPosition, newParticipant, toReference, undoProgress } from '../domain/progress';
-import type { Comment, Gif, JoinMode, NotifyPref, Participant, ProgressUnit } from '../domain/types';
+import type { Comment, Gif, JoinMode, NotifyPref, Participant, ProgressUnit, UserPrefs } from '../domain/types';
+import { gifFromId, GIPHY_ID } from '../gifs';
 import type { DataStore, ReadingEntry } from '../store/data-store';
 import type { NotifyEvent } from './notifications';
 
@@ -342,8 +344,28 @@ export class Service {
     }
   }
 
+  private prefs(userId: string): UserPrefs {
+    return this.store.users.get(userId)?.value ?? { userId, notify: DEFAULT_NOTIFY };
+  }
+
   async setNotify(userId: string, notify: NotifyPref): Promise<void> {
     if (!NOTIFY_PREFS.includes(notify)) throw new HttpError(400, 'Préférence invalide');
-    await this.store.saveUserPrefs({ userId, notify });
+    await this.store.saveUserPrefs({ ...this.prefs(userId), notify });
+  }
+
+  favoriteGifs(userId: string): Gif[] {
+    return (this.prefs(userId).favoriteGifs ?? []).map(gifFromId);
+  }
+
+  /** Adds the GIF to the user's favorites (most recent first), or removes it if already there. */
+  async toggleFavoriteGif(userId: string, gifId: string): Promise<Gif[]> {
+    if (!GIPHY_ID.test(gifId)) throw new HttpError(400, 'GIF invalide');
+    const prefs = this.prefs(userId);
+    const current = prefs.favoriteGifs ?? [];
+    const favoriteGifs = current.includes(gifId)
+      ? current.filter((id) => id !== gifId)
+      : [gifId, ...current].slice(0, MAX_FAVORITE_GIFS);
+    await this.store.saveUserPrefs({ ...prefs, favoriteGifs });
+    return favoriteGifs.map(gifFromId);
   }
 }

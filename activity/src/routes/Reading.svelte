@@ -244,7 +244,12 @@
         </div>
 
         <div class="comments">
-          {#each shownComments as comment (comment.id)}
+          {#each shownComments as comment, i (comment.id)}
+            {#if i > 0 && comment.position !== shownComments[i - 1]!.position}
+              <div class="separator" role="separator">
+                <span>{positionText(reading.unit, comment.position)}</span>
+              </div>
+            {/if}
             <CommentItem
               {comment}
               members={view.members}
@@ -394,6 +399,21 @@
   }
   .locked-note {
     text-align: center;
+  }
+  .separator {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .separator::before,
+  .separator::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border-strong);
   }
   .toast {
     position: fixed;

@@ -124,6 +124,25 @@ describe('Service', () => {
     await expect(ctx.service.editComment(BRUNO, book.id, c.id, 'x')).rejects.toThrow(HttpError);
   });
 
+  it('keeps favorite GIFs, newest first, alongside notification preferences', async () => {
+    await ctx.service.toggleFavoriteGif(BRUNO, 'abc');
+    await ctx.service.toggleFavoriteGif(BRUNO, 'def');
+    await ctx.service.setNotify(BRUNO, 'none');
+    expect(ctx.service.favoriteGifs(BRUNO).map((g) => g.id)).toEqual(['def', 'abc']);
+    expect(ctx.service.favoriteGifs(BRUNO)[0]!.url).toBe('https://media.giphy.com/media/def/200.gif');
+
+    await ctx.service.toggleFavoriteGif(BRUNO, 'abc'); // second toggle removes it
+    const reloaded = await setup(ctx.discord);
+    expect(reloaded.service.favoriteGifs(BRUNO).map((g) => g.id)).toEqual(['def']);
+    expect(reloaded.store.users.get(BRUNO)?.value.notify).toBe('none');
+    await expect(ctx.service.toggleFavoriteGif(BRUNO, '../x')).rejects.toThrow(HttpError);
+  });
+
+  it('fits the maximum number of favorites in one record', async () => {
+    for (let i = 0; i < 70; i++) await ctx.service.toggleFavoriteGif(ALICE, `${'x'.repeat(20)}${i.toString().padStart(4, '0')}`);
+    expect(ctx.service.favoriteGifs(ALICE)).toHaveLength(60);
+  });
+
   it('converts a personal edition to the reference edition', async () => {
     const book = await createBook(ctx.service, 'page', 352);
     await ctx.service.setProgress(BRUNO, book.id, 120, 410);

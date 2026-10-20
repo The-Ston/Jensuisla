@@ -17,6 +17,21 @@ function strip(url: string): string {
   return url.split('?')[0]!;
 }
 
+// Giphy ids are ~18 characters; capping the length keeps 60 favorites within one Discord message.
+export const GIPHY_ID = /^[A-Za-z0-9]{1,24}$/;
+
+/** Rebuilds a GIF from its Giphy id (favorites only store ids to stay small). */
+export function gifFromId(id: string): Gif {
+  return {
+    id,
+    url: `https://media.giphy.com/media/${id}/200.gif`,
+    previewUrl: `https://media.giphy.com/media/${id}/100.gif`,
+    width: 0,
+    height: 0,
+    title: '',
+  };
+}
+
 /** Searches GIFs on Giphy, or returns trending ones when the query is empty. */
 export async function searchGifs(apiKey: string, query: string): Promise<Gif[]> {
   const params = new URLSearchParams({ api_key: apiKey, limit: '24', rating: 'pg-13', lang: 'fr' });

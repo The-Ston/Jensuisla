@@ -4,6 +4,7 @@
   import { REACTION_EMOJIS } from '$shared/domain/limits';
   import { img, positionText, timeAgo } from '../lib/format';
   import Avatar from './Avatar.svelte';
+  import FavoriteStar from './FavoriteStar.svelte';
   import GifPicker from './GifPicker.svelte';
 
   let {
@@ -143,14 +144,17 @@
     {:else}
       {#if comment.text}<p>{comment.text}</p>{/if}
       {#if comment.gif}
-        <img
-          class="gif"
-          src={img(comment.gif.url)}
-          alt={comment.gif.title || 'GIF'}
-          width={comment.gif.width || undefined}
-          height={comment.gif.height || undefined}
-          loading="lazy"
-        />
+        <div class="gif-box">
+          <img
+            class="gif"
+            src={img(comment.gif.url)}
+            alt={comment.gif.title || 'GIF'}
+            width={comment.gif.width || undefined}
+            height={comment.gif.height || undefined}
+            loading="lazy"
+          />
+          <FavoriteStar gif={comment.gif} />
+        </div>
       {/if}
 
       <div class="reactions">
@@ -237,8 +241,14 @@
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
-  .gif {
+  .gif-box {
+    position: relative;
+    width: fit-content;
     max-width: min(100%, 280px);
+  }
+  .gif {
+    display: block;
+    max-width: 100%;
     height: auto;
     border-radius: 8px;
   }

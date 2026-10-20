@@ -61,4 +61,6 @@ export interface Comment {
 export interface UserPrefs {
   userId: string;
   notify: NotifyPref;
+  /** Giphy ids, most recent first. Optional for records written before favorites existed. */
+  favoriteGifs?: string[];
 }

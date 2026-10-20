@@ -148,6 +148,13 @@ async function handleApi(request: Request, env: Env, ctx: ExecutionContext, url:
     const q = url.searchParams.get('q')?.trim();
     return json(q ? await searchBooks(q) : []);
   }
+  if (parts[0] === 'gifs' && parts[1] === 'favorites') {
+    if (method === 'GET') return fromResult(await store(env).run(userId, { op: 'favorites' }));
+    if (method === 'POST') {
+      const { id } = await body<{ id?: string }>(request);
+      return fromResult(await store(env).run(userId, { op: 'toggleFavorite', gifId: String(id ?? '') }));
+    }
+  }
   if (parts[0] === 'gifs' && method === 'GET') {
     if (!env.GIPHY_API_KEY) return fail(503, 'GIF non configurés');
     return json(await searchGifs(env.GIPHY_API_KEY, url.searchParams.get('q')?.trim() ?? ''));
