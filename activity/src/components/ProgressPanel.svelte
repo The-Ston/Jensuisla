@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { MyProgressView, ProgressUnit } from '$shared/api-types';
-  import { fromReference, stepSize } from '$shared/domain/progress';
+  import { stepSize } from '$shared/domain/progress';
   import { positionText } from '../lib/format';
 
   let {
@@ -27,7 +27,8 @@
   // In page mode a reader may use another edition: everything they type is in their own pages.
   const edition = $derived(unit === 'page' ? me.editionTotal : null);
   const myTotal = $derived(edition ?? total);
-  const shown = $derived(fromReference(me.progress, edition, total));
+  // Exactly what the reader typed (a round trip through the reference edition could shift it).
+  const shown = $derived(me.shownProgress);
   const step = $derived(stepSize(unit));
 
   async function run(action: () => Promise<void>) {

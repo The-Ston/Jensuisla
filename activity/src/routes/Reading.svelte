@@ -8,7 +8,7 @@
   import Timeline from '../components/Timeline.svelte';
   import { api } from '../lib/api';
   import { emojis } from '../lib/emojis.svelte';
-  import { positionText } from '../lib/format';
+  import { displayTotal, makeScale, rangeLabel, scaleLabel } from '../lib/scale';
   import { buildPoints } from '../lib/timeline';
 
   let { id, onBack }: { id: string; onBack: () => void } = $props();
@@ -30,6 +30,15 @@
 
   const reading = $derived(view?.reading);
   const myProgress = $derived(view?.me?.progress ?? 0);
+  // Everything is shown in the reader's own edition when they have one (page unit).
+  const scale = $derived(
+    makeScale(
+      view?.reading.unit ?? 'chapter',
+      view?.reading.total ?? 1,
+      view?.me?.editionTotal ?? null,
+      view?.me ? { progress: view.me.progress, shown: view.me.shownProgress } : null,
+    ),
+  );
   const points = $derived(view ? buildPoints(view, view.viewerId, lastVisit, seen) : []);
   const selectedPoint = $derived(typeof selected === 'number' ? points.find((p) => p.start === selected) : undefined);
   const selectedIndex = $derived(selectedPoint ? points.indexOf(selectedPoint) : -1);
@@ -115,7 +124,7 @@
 
   async function changeProgress(value: number, editionTotal: number | null) {
     await mutate(() => api.progress(id, value, editionTotal));
-    if (view?.me) showToast(`Avancement enregistré : ${positionText(view.reading.unit, view.me.progress)}`);
+    if (view?.me) showToast(`Avancement enregistré : ${scaleLabel(scale, view.me.progress)}`);
   }
 
   async function undo() {
@@ -185,8 +194,8 @@
         <div>
           <h1>{reading.title}</h1>
           <p class="muted">
-            {reading.author ? `${reading.author} · ` : ''}{reading.total}
-            {reading.unit === 'chapter' ? 'chapitres' : reading.unit === 'page' ? 'pages' : '%'} · {view.participants.length} lecteur{view.participants.length > 1 ? 's' : ''}
+            {reading.author ? `${reading.author} · ` : ''}{displayTotal(scale)}
+            {reading.unit === 'chapter' ? 'chapitres' : reading.unit === 'page' ? 'pages' : '%'}{scale.edition ? ' (ton édition)' : ''} · {view.participants.length} lecteur{view.participants.length > 1 ? 's' : ''}
           </p>
         </div>
       </div>
@@ -233,8 +242,7 @@
         <span class="muted small">Clique sur un point pour voir ses messages</span>
       </div>
       <Timeline
-        unit={reading.unit}
-        total={reading.total}
+        {scale}
         {points}
         {readers}
         {myProgress}
@@ -250,11 +258,9 @@
             {#if selected === 'all'}
               Tous les messages
             {:else if selectedPoint}
-              {selectedPoint.start === selectedPoint.end
-                ? positionText(reading.unit, selectedPoint.start)
-                : `${positionText(reading.unit, selectedPoint.start)} à ${selectedPoint.end}`}
+              {rangeLabel(scale, selectedPoint.start, selectedPoint.end)}
             {:else}
-              Ma position : {positionText(reading.unit, myProgress)}
+              Ma position : {scaleLabel(scale, myProgress)}
             {/if}
           </h2>
           <div class="nav">
@@ -270,13 +276,13 @@
           {#each shownComments as comment, i (comment.id)}
             {#if i > 0 && comment.position !== shownComments[i - 1]!.position}
               <div class="separator" role="separator">
-                <span>{positionText(reading.unit, comment.position)}</span>
+                <span>{scaleLabel(scale, comment.position)}</span>
               </div>
             {/if}
             <CommentItem
               {comment}
               members={view.members}
-              unit={reading.unit}
+              {scale}
               meId={view.viewerId}
               canModerate={reading.organizerId === view.viewerId}
               onReact={(emoji) => mutate(() => api.react(id, comment.id, emoji))}
@@ -293,7 +299,7 @@
             </p>
           {/each}
           {#if selected === 'all' && myProgress < reading.total}
-            <p class="muted small locked-note">Les messages après {positionText(reading.unit, myProgress).toLowerCase()} sont masqués.</p>
+            <p class="muted small locked-note">Les messages après {scaleLabel(scale, myProgress).toLowerCase()} sont masqués.</p>
           {/if}
         </div>
 
@@ -302,7 +308,7 @@
           bind:position={composerPosition}
           bind:replyTo={composerReply}
           replyAuthor={composerReply ? (view.members[composerReply.authorId]?.name ?? '') : ''}
-          unit={reading.unit}
+          {scale}
           max={myProgress}
           onSend={sendComment}
         />

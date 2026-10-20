@@ -21,13 +21,14 @@ export type Outgoing =
 const MAX_LINES = 10;
 const MAX_CONTENT = 1900;
 
-export function positionLabel(unit: ProgressUnit, position: number): string {
+/** `approx`: the page was converted to another edition, so it is only close. */
+export function positionLabel(unit: ProgressUnit, position: number, approx = false): string {
   if (position === 0) return 'avant de commencer';
   switch (unit) {
     case 'chapter':
       return `au chapitre ${position}`;
     case 'page':
-      return `à la page ${position}`;
+      return approx ? `vers la page ${position}` : `à la page ${position}`;
     case 'percent':
       return `à ${position} %`;
   }
@@ -86,7 +87,7 @@ export function buildNotifications(
           describe(
             e,
             nameOf(e.actorId),
-            positionLabel(unit, fromReference(e.position, p.editionTotal, total)),
+            positionLabel(unit, fromReference(e.position, p.editionTotal, total), !!p.editionTotal && p.editionTotal !== total),
             true,
             e.targetAuthorId === p.userId ? 'toi' : nameOf(e.targetAuthorId ?? ''),
           ),
@@ -99,10 +100,13 @@ export function buildNotifications(
 
     if (mentionIds.size > 0) {
       // Visible to the whole channel: no excerpts, only who did what where.
-      for (const e of readingEvents)
-        channelLines.push(
-          describe(e, nameOf(e.actorId), positionLabel(unit, e.position), false, nameOf(e.targetAuthorId ?? '')),
-        );
+      // Shared message: pages of the reference edition, said explicitly if some read another one.
+      const mixedEditions =
+        unit === 'page' && [...entry.participants.values()].some(({ value }) => value.editionTotal && value.editionTotal !== total);
+      for (const e of readingEvents) {
+        const where = positionLabel(unit, e.position) + (mixedEditions && e.position > 0 ? ' (édition de référence)' : '');
+        channelLines.push(describe(e, nameOf(e.actorId), where, false, nameOf(e.targetAuthorId ?? '')));
+      }
       const mentions = [...mentionIds].map((id) => `<@${id}>`).join(' ');
       out.push({ kind: 'channel', content: `${render(title, channelLines)}\n${mentions}`, mentionIds: [...mentionIds] });
     }

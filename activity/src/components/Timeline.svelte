@@ -1,20 +1,18 @@
 <script lang="ts">
-  import type { MemberView, ProgressUnit } from '$shared/api-types';
-  import { positionText } from '../lib/format';
+  import type { MemberView } from '$shared/api-types';
+  import { rangeLabel, scaleLabel, type Scale } from '../lib/scale';
   import type { TimelinePoint } from '../lib/timeline';
   import Avatar from './Avatar.svelte';
 
   let {
-    unit,
-    total,
+    scale,
     points,
     readers,
     myProgress,
     selected,
     onSelect,
   }: {
-    unit: ProgressUnit;
-    total: number;
+    scale: Scale;
     points: TimelinePoint[];
     readers: { member: MemberView; progress: number; isMe: boolean }[];
     myProgress: number;
@@ -22,6 +20,8 @@
     onSelect: (key: number | 'here') => void;
   } = $props();
 
+  // The timeline is proportional, so it looks the same in every edition.
+  const total = $derived(scale.total);
   const pct = (position: number) => (total > 0 ? (position / total) * 100 : 0);
 
   // Readers at the same position are spread slightly so every avatar stays visible.
@@ -34,14 +34,13 @@
     });
   });
 
-  const label = (p: TimelinePoint) =>
-    p.start === p.end ? positionText(unit, p.start) : `${positionText(unit, p.start)} à ${p.end}`;
+  const label = (p: TimelinePoint) => rangeLabel(scale, p.start, p.end);
 </script>
 
 <div class="scroller">
   <div class="timeline" style:min-width="{Math.max(320, Math.min(points.length * 44, 1400))}px">
     {#each placed as r (r.member.id)}
-      <span class="reader" style:left="calc({pct(r.progress)}% + {r.offset}px)" title="{r.member.name} : {positionText(unit, r.progress)}">
+      <span class="reader" style:left="calc({pct(r.progress)}% + {r.offset}px)" title="{r.member.name} : {scaleLabel(scale, r.progress)}">
         <Avatar member={r.member} size={24} ring={r.isMe ? 'var(--me)' : 'var(--surface)'} />
       </span>
     {/each}
@@ -73,7 +72,7 @@
       class="here"
       class:selected={selected === 'here'}
       style:left="{pct(myProgress)}%"
-      aria-label="Ma position : {positionText(unit, myProgress)}"
+      aria-label="Ma position : {scaleLabel(scale, myProgress)}"
       aria-pressed={selected === 'here'}
       onclick={() => onSelect('here')}>ici</button
     >

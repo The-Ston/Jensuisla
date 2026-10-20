@@ -30,6 +30,8 @@ export interface Participant {
   progress: number;
   /** Page count of this reader's own edition (page unit only), null = reference edition. */
   editionTotal: number | null;
+  /** Page the reader typed in their own edition, shown back as is (conversion rounds). */
+  editionProgress?: number | null;
   /** Previous progress values, most recent last, used by "undo". */
   history: number[];
   lastVisit: { at: number; progress: number } | null;

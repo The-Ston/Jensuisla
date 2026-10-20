@@ -1,18 +1,20 @@
 <script lang="ts">
   import { tick } from 'svelte';
-  import type { Comment, Gif, ProgressUnit } from '$shared/api-types';
-  import { img, positionText } from '../lib/format';
+  import type { Comment, Gif } from '$shared/api-types';
+  import { img } from '../lib/format';
+  import { fromDisplay, scaleLabel, toDisplay, type Scale } from '../lib/scale';
   import GifPicker from './GifPicker.svelte';
 
   let {
-    unit,
+    scale,
     max,
     position = $bindable(),
     replyTo = $bindable(),
     replyAuthor = '',
     onSend,
   }: {
-    unit: ProgressUnit;
+    /** Positions are reference positions; the reader sees and types them in their own scale. */
+    scale: Scale;
     /** Furthest position the reader may write at (their progress). */
     max: number;
     position: number;
@@ -41,7 +43,7 @@
   }
 
   async function openPosition() {
-    positionDraft = position;
+    positionDraft = toDisplay(scale, position);
     editingPosition = true;
     await tick();
     positionInput?.select();
@@ -49,7 +51,8 @@
 
   function commitPosition() {
     if (!editingPosition) return;
-    if (Number.isFinite(positionDraft)) position = Math.max(min, Math.min(max, Math.round(positionDraft)));
+    if (Number.isFinite(positionDraft))
+      position = Math.max(min, Math.min(max, fromDisplay(scale, Math.round(positionDraft))));
     editingPosition = false;
     textarea?.focus();
   }
@@ -123,13 +126,15 @@
   <form class="box" class:with-reply={!!replyTo} onsubmit={send}>
     <div class="anchor">
       {#if editingPosition}
-        <label class="sr-only" for="comment-position">Position du commentaire ({min} à {max})</label>
+        <label class="sr-only" for="comment-position">
+          Position du commentaire ({toDisplay(scale, min)} à {toDisplay(scale, max)}{scale.edition ? ', pages de ton édition' : ''})
+        </label>
         <input
           id="comment-position"
           class="position-input"
           type="number"
-          {min}
-          {max}
+          min={toDisplay(scale, min)}
+          max={toDisplay(scale, max)}
           bind:value={positionDraft}
           bind:this={positionInput}
           onkeydown={onPositionKey}
@@ -140,10 +145,10 @@
           type="button"
           class="chip"
           title="Changer la position du commentaire"
-          aria-label="Position : {positionText(unit, position)}. Cliquer pour changer"
+          aria-label="Position : {scaleLabel(scale, position)}. Cliquer pour changer"
           onclick={openPosition}
         >
-          {positionText(unit, position)}
+          {scaleLabel(scale, position)}
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>
         </button>
       {/if}

@@ -23,6 +23,9 @@ export interface ReadingSummary {
   canJoin: boolean;
   canInvite: boolean;
   myProgress: number | null;
+  /** The reader's progress and total in their own edition (page unit), for display. */
+  myShownProgress: number | null;
+  myShownTotal: number;
 }
 
 export interface HomeView {
@@ -36,8 +39,11 @@ export interface ParticipantView {
 }
 
 export interface MyProgressView {
+  /** Reference units. */
   progress: number;
   editionTotal: number | null;
+  /** Progress as the reader sees it: in their own edition when they have one. */
+  shownProgress: number;
   canUndo: boolean;
   lastVisit: { at: number; progress: number } | null;
 }

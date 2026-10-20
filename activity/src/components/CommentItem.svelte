@@ -1,10 +1,11 @@
 <script lang="ts">
   import { tick } from 'svelte';
-  import type { Comment, Gif, MemberView, ProgressUnit } from '$shared/api-types';
+  import type { Comment, Gif, MemberView } from '$shared/api-types';
   import { REACTION_EMOJIS } from '$shared/domain/limits';
   import { parseCustomKey } from '$shared/domain/reactions';
   import { emojis } from '../lib/emojis.svelte';
-  import { img, positionText, timeAgo } from '../lib/format';
+  import { img, timeAgo } from '../lib/format';
+  import { scaleLabel, type Scale } from '../lib/scale';
   import Avatar from './Avatar.svelte';
   import EmojiPicker from './EmojiPicker.svelte';
   import ReactionGlyph from './ReactionGlyph.svelte';
@@ -14,7 +15,7 @@
   let {
     comment,
     members,
-    unit,
+    scale,
     meId,
     canModerate,
     original,
@@ -27,7 +28,7 @@
   }: {
     comment: Comment;
     members: Record<string, MemberView>;
-    unit: ProgressUnit;
+    scale: Scale;
     meId: string;
     canModerate: boolean;
     /** The comment this one replies to: undefined if not a reply, null if it was deleted. */
@@ -135,7 +136,7 @@
   <div class="body">
     <div class="meta">
       <strong>{author?.name ?? 'Ancien membre'}</strong>
-      <span class="muted">{positionText(unit, comment.position)} · {timeAgo(comment.createdAt)}{comment.editedAt ? ' · modifié' : ''}</span>
+      <span class="muted">{scaleLabel(scale, comment.position)} · {timeAgo(comment.createdAt)}{comment.editedAt ? ' · modifié' : ''}</span>
     </div>
 
     {#if editing}

@@ -18,7 +18,14 @@ import {
 } from '../domain/limits';
 import { customKey, isStandardEmoji, MAX_REACTION_KINDS, parseCustomKey } from '../domain/reactions';
 import { emojiUrl, proxied } from '../discord/cdn';
-import { applyProgress, clampPosition, newParticipant, toReference, undoProgress } from '../domain/progress';
+import {
+  applyProgress,
+  clampPosition,
+  fromReference,
+  newParticipant,
+  toReference,
+  undoProgress,
+} from '../domain/progress';
 import type { Comment, Gif, JoinMode, NotifyPref, Participant, ProgressUnit, UserPrefs } from '../domain/types';
 import { gifFromId, GIPHY_ID } from '../gifs';
 import type { DataStore, ReadingEntry } from '../store/data-store';
@@ -107,6 +114,8 @@ export class Service {
       canJoin: !me && r.joinMode !== 'invite',
       canInvite: r.organizerId === userId && r.joinMode !== 'open',
       myProgress: me?.progress ?? null,
+      myShownProgress: me ? (me.editionProgress ?? fromReference(me.progress, me.editionTotal, r.total)) : null,
+      myShownTotal: (r.unit === 'page' && me?.editionTotal) || r.total,
     };
   }
 
@@ -201,6 +210,7 @@ export class Service {
       me: me && {
         progress: me.progress,
         editionTotal: me.editionTotal,
+        shownProgress: me.editionProgress ?? fromReference(me.progress, me.editionTotal, entry.reading.total),
         canUndo: me.history.length > 0,
         lastVisit: me.lastVisit,
       },
@@ -236,7 +246,11 @@ export class Service {
     }
     if (!Number.isFinite(value)) throw new HttpError(400, 'Avancement invalide');
     const reference = clampPosition(r, toReference(value, edition, r.total));
-    const next = { ...applyProgress(current, reference), editionTotal: edition };
+    const next = {
+      ...applyProgress(current, reference),
+      editionTotal: edition,
+      editionProgress: edition ? Math.max(0, Math.min(edition, Math.round(value))) : null,
+    };
     await this.store.saveParticipant(readingId, next);
   }
 
@@ -244,7 +258,8 @@ export class Service {
     const entry = this.entry(readingId);
     const previous = undoProgress(this.participant(entry, userId));
     if (!previous) throw new HttpError(400, 'Rien à annuler');
-    await this.store.saveParticipant(readingId, previous);
+    // History only keeps reference values: the restored page is converted back for display.
+    await this.store.saveParticipant(readingId, { ...previous, editionProgress: null });
   }
 
   async markVisited(userId: string, readingId: string): Promise<void> {

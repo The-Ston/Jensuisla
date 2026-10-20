@@ -212,7 +212,18 @@ describe('Service', () => {
     const book = await createBook(ctx.service, 'page', 352);
     await ctx.service.setProgress(BRUNO, book.id, 120, 410);
     const view = await ctx.service.readingView(BRUNO, book.id);
-    expect(view.me).toMatchObject({ progress: 103, editionTotal: 410 });
+    // Stored in reference pages, shown back exactly as typed.
+    expect(view.me).toMatchObject({ progress: 103, editionTotal: 410, shownProgress: 120 });
+    expect(view.reading).toMatchObject({ myShownProgress: 120, myShownTotal: 410 });
+
+    // Notifications use the reader's own pages, marked as approximate.
+    await ctx.service.setProgress(ALICE, book.id, 100, null);
+    await ctx.service.addComment(ALICE, book.id, { position: 100, text: 'ici', gif: null });
+    const out = buildNotifications(ctx.events, ctx.store, (id) => id, () => 'dm');
+    expect(out.find((o) => o.kind === 'dm' && o.userId === BRUNO)?.content).toContain('vers la page 116');
+
+    await ctx.service.undoProgress(BRUNO, book.id);
+    expect((await ctx.service.readingView(BRUNO, book.id)).me?.shownProgress).toBe(0);
   });
 
   it('respects invitation-only readings', async () => {
