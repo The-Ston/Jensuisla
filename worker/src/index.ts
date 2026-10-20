@@ -1,5 +1,5 @@
 import { searchBooks } from './books';
-import { IMAGE_HOSTS } from './discord/cdn';
+import { isAllowedImage, TWEMOJI } from './discord/cdn';
 import { exchangeOAuthCode } from './discord/rest';
 import { verifyInteraction } from './discord/verify';
 import type { Env } from './env';
@@ -50,13 +50,17 @@ async function handleInteraction(request: Request, env: Env): Promise<Response> 
 
 /** Proxies an allow-listed external image (the Activity sandbox only reaches its own origin). */
 async function proxyImage(url: string | null): Promise<Response> {
-  if (!url || !IMAGE_HOSTS.test(url)) return new Response('forbidden', { status: 403 });
-  const upstream = await fetch(url, { cf: { cacheTtl: 86400, cacheEverything: true } });
+  if (!url || !isAllowedImage(url)) return new Response('forbidden', { status: 403 });
+  // Versioned Twemoji files never change; other images (avatars…) may.
+  const ttl = TWEMOJI.test(url) ? 30 * 86400 : 86400;
+  const upstream = await fetch(url, { cf: { cacheTtl: ttl, cacheEverything: true } });
   if (!upstream.ok) return new Response('not found', { status: 404 });
   return new Response(upstream.body, {
     headers: {
       'Content-Type': upstream.headers.get('Content-Type') ?? 'image/png',
-      'Cache-Control': 'public, max-age=86400',
+      'Cache-Control': `public, max-age=${ttl}`,
+      // SVGs are served from our origin: never let one run scripts if opened directly.
+      'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'",
     },
   });
 }

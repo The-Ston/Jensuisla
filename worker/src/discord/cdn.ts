@@ -15,4 +15,10 @@ export function proxied(url: string): string {
   return `/api/img?u=${encodeURIComponent(url)}`;
 }
 
-export const IMAGE_HOSTS = /^https:\/\/(cdn\.discordapp\.com|media\.discordapp\.net|covers\.openlibrary\.org|(media\d*|i)\.giphy\.com)\//;
+const IMAGE_HOSTS = /^https:\/\/(cdn\.discordapp\.com|media\.discordapp\.net|covers\.openlibrary\.org|(media\d*|i)\.giphy\.com)\//;
+/** Twemoji, the emoji artwork Discord uses, from a pinned release. */
+export const TWEMOJI = /^https:\/\/cdn\.jsdelivr\.net\/gh\/jdecked\/twemoji@[\d.]+\/assets\/svg\/[0-9a-f-]+\.svg$/;
+
+export function isAllowedImage(url: string): boolean {
+  return IMAGE_HOSTS.test(url) || TWEMOJI.test(url);
+}

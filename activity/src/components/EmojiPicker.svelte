@@ -11,7 +11,9 @@
   let input: HTMLInputElement | undefined = $state();
   let scroller: HTMLDivElement | undefined = $state();
 
-  const q = $derived(normalize(query.trim()));
+  // ":joy:" and "joy" search the same way.
+  const q = $derived(normalize(query.trim().replace(/^:+|:+$/g, '')));
+  const byUnicode = $derived(new Map(groups.flatMap((g) => g.emojis).map((e) => [e.unicode, e])));
   const results = $derived.by(() => {
     if (!q) return null;
     const custom = emojis.custom.filter((e) => normalize(e.name).includes(q)).map((e) => e.key);
@@ -44,13 +46,19 @@
     }
   }
 
-  const labelOf = (key: string) => emojis.customFor(key)?.name ?? key;
+  function labelOf(key: string): string {
+    const custom = emojis.customFor(key);
+    if (custom) return `:${custom.name}:`;
+    const e = byUnicode.get(key);
+    if (!e) return key;
+    return e.shortcode ? `:${e.shortcode}: · ${e.label}` : e.label;
+  }
 </script>
 
 <div class="picker" role="dialog" aria-label="Choisir une réaction" tabindex="-1" onkeydown={onKey}>
   <div class="head">
     <label class="sr-only" for="emoji-search">Chercher un emoji</label>
-    <input id="emoji-search" class="input" placeholder="Chercher (rire, cœur, livre…)" bind:value={query} bind:this={input} />
+    <input id="emoji-search" class="input" placeholder="Chercher (rire, cœur, :joy:…)" bind:value={query} bind:this={input} />
     <button type="button" class="close" aria-label="Fermer" onclick={onClose}>✕</button>
   </div>
 
@@ -65,7 +73,9 @@
         </button>
       {/if}
       {#each groups as g, i (g.name)}
-        <button type="button" title={g.name} onclick={() => jump(`emoji-group-${i}`)}>{g.emojis[0]?.unicode}</button>
+        <button type="button" title={g.name} aria-label={g.name} onclick={() => jump(`emoji-group-${i}`)}>
+          {#if g.emojis[0]}<ReactionGlyph emojiKey={g.emojis[0].unicode} size={20} label={g.name} />{/if}
+        </button>
       {/each}
     </nav>
   {/if}
@@ -109,7 +119,9 @@
         <h3 id="emoji-group-{i}">{g.name}</h3>
         <div class="grid">
           {#each g.emojis as e (e.unicode)}
-            <button type="button" title={e.label} aria-label={e.label} onclick={() => pick(e.unicode)}>{e.unicode}</button>
+            <button type="button" title={labelOf(e.unicode)} aria-label={e.label} onclick={() => pick(e.unicode)}>
+              <ReactionGlyph emojiKey={e.unicode} size={24} label={e.label} />
+            </button>
           {/each}
         </div>
       {/each}

@@ -201,7 +201,7 @@
       {:else if picking}
         <div class="picker" role="group" aria-label="Choisir une réaction">
           {#each REACTION_EMOJIS as emoji (emoji)}
-            <button disabled={busy} onclick={() => react(emoji)}>{emoji}</button>
+            <button disabled={busy} aria-label={emoji} onclick={() => react(emoji)}><ReactionGlyph emojiKey={emoji} size={22} /></button>
           {/each}
           <button
             class="more"

@@ -3,12 +3,16 @@ import { parseCustomKey } from '$shared/domain/reactions';
 import { api } from './api';
 
 const RECENTS_KEY = 'jensuisla.recentEmojis';
+/** Emoji 18.0 additions: Twemoji 17 has no artwork for them yet, so they are not offered. */
+const NOT_DRAWN = new Set(['1FAEB', '1FAF9', '1FAFA', '1FACC', '1FADD', '1F6D9', '1FA8B', '1FA8C', '1FA8D']);
 const MAX_RECENTS = 24;
 
 export interface StandardEmoji {
   unicode: string;
   label: string;
-  /** Lowercased, accent-free label and tags, for search. */
+  /** Discord-style name (`joy` for 😂), when known. */
+  shortcode: string | null;
+  /** Lowercased, accent-free label, tags and shortcodes, for search. */
   search: string;
 }
 
@@ -74,13 +78,27 @@ export const emojis = {
     groups ??= Promise.all([
       import('emojibase-data/fr/compact.json'),
       import('emojibase-data/fr/messages.json'),
-    ]).then(([data, messages]) => {
+      // Discord's emoji names (:joy:, :cockroach:…) are close to Slack's (iamcal) and GitHub's.
+      import('emojibase-data/en/shortcodes/iamcal.json'),
+      import('emojibase-data/en/shortcodes/github.json'),
+    ]).then(([data, messages, iamcal, github]) => {
+      const codes = (hexcode: string): string[] =>
+        [iamcal.default, github.default].flatMap((set) => {
+          const value = (set as Record<string, string | string[]>)[hexcode];
+          return value === undefined ? [] : Array.isArray(value) ? value : [value];
+        });
       const byGroup = new Map<number, StandardEmoji[]>();
-      for (const e of data.default as { unicode: string; label: string; group?: number; tags?: string[] }[]) {
+      for (const e of data.default as { unicode: string; hexcode: string; label: string; group?: number; tags?: string[] }[]) {
         // Group 2 holds skin-tone components, not usable alone.
-        if (e.group === undefined || e.group === 2) continue;
+        if (e.group === undefined || e.group === 2 || NOT_DRAWN.has(e.hexcode)) continue;
+        const shortcodes = codes(e.hexcode);
         const list = byGroup.get(e.group) ?? [];
-        list.push({ unicode: e.unicode, label: e.label, search: normalize([e.label, ...(e.tags ?? [])].join(' ')) });
+        list.push({
+          unicode: e.unicode,
+          label: e.label,
+          shortcode: shortcodes[0] ?? null,
+          search: normalize([e.label, ...(e.tags ?? []), ...shortcodes].join(' ')),
+        });
         byGroup.set(e.group, list);
       }
       return (messages.default.groups as { message: string; order: number }[])
