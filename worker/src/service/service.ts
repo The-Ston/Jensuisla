@@ -295,13 +295,21 @@ export class Service {
     return comment;
   }
 
-  async editComment(userId: string, readingId: string, commentId: string, text: string): Promise<void> {
+  /** `gif`: undefined keeps the current GIF, null removes it. */
+  async editComment(
+    userId: string,
+    readingId: string,
+    commentId: string,
+    text: string,
+    gif?: Gif | null,
+  ): Promise<void> {
     const entry = this.entry(readingId);
     const comment = this.visibleComment(entry, userId, commentId);
     if (comment.authorId !== userId) throw new HttpError(403, "Ce n'est pas ton commentaire");
     const trimmed = (text ?? '').trim();
-    if ((!trimmed && !comment.gif) || trimmed.length > MAX_COMMENT_LENGTH) throw new HttpError(400, 'Commentaire invalide');
-    await this.store.saveComment(readingId, { ...comment, text: trimmed, editedAt: this.now() });
+    const nextGif = gif === undefined ? comment.gif : this.validGif(gif);
+    if ((!trimmed && !nextGif) || trimmed.length > MAX_COMMENT_LENGTH) throw new HttpError(400, 'Commentaire invalide');
+    await this.store.saveComment(readingId, { ...comment, text: trimmed, gif: nextGif, editedAt: this.now() });
   }
 
   async deleteComment(userId: string, readingId: string, commentId: string): Promise<void> {

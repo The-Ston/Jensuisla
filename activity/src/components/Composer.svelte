@@ -1,21 +1,61 @@
 <script lang="ts">
-  import type { Gif } from '$shared/api-types';
-  import { api } from '../lib/api';
-  import { img } from '../lib/format';
+  import { tick } from 'svelte';
+  import type { Gif, ProgressUnit } from '$shared/api-types';
+  import { img, positionText } from '../lib/format';
+  import GifPicker from './GifPicker.svelte';
 
-  let { anchorLabel, onSend }: { anchorLabel: string; onSend: (text: string, gif: Gif | null) => Promise<void> } =
-    $props();
+  let {
+    unit,
+    max,
+    position = $bindable(),
+    onSend,
+  }: {
+    unit: ProgressUnit;
+    /** Furthest position the reader may write at (their progress). */
+    max: number;
+    position: number;
+    onSend: (text: string, gif: Gif | null, position: number) => Promise<void>;
+  } = $props();
 
   let text = $state('');
   let gif = $state<Gif | null>(null);
   let sending = $state(false);
   let error = $state('');
-
   let picking = $state(false);
-  let gifQuery = $state('');
-  let gifs = $state<Gif[]>([]);
-  let gifError = $state('');
-  let loadingGifs = $state(false);
+  let textarea: HTMLTextAreaElement | undefined = $state();
+
+  let editingPosition = $state(false);
+  let positionDraft = $state(0);
+  let positionInput: HTMLInputElement | undefined = $state();
+
+  export function focus() {
+    textarea?.focus();
+  }
+
+  async function openPosition() {
+    positionDraft = position;
+    editingPosition = true;
+    await tick();
+    positionInput?.select();
+  }
+
+  function commitPosition() {
+    if (!editingPosition) return;
+    if (Number.isFinite(positionDraft)) position = Math.max(0, Math.min(max, Math.round(positionDraft)));
+    editingPosition = false;
+    textarea?.focus();
+  }
+
+  function onPositionKey(event: KeyboardEvent) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      commitPosition();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      editingPosition = false;
+      textarea?.focus();
+    }
+  }
 
   async function send(event: SubmitEvent) {
     event.preventDefault();
@@ -23,7 +63,7 @@
     sending = true;
     error = '';
     try {
-      await onSend(text, gif);
+      await onSend(text, gif, position);
       text = '';
       gif = null;
     } catch (e) {
@@ -39,71 +79,69 @@
       (event.currentTarget as HTMLTextAreaElement).form?.requestSubmit();
     }
   }
-
-  async function searchGifs(event?: SubmitEvent) {
-    event?.preventDefault();
-    loadingGifs = true;
-    gifError = '';
-    try {
-      gifs = await api.gifs(gifQuery.trim());
-    } catch (e) {
-      gifError = e instanceof Error ? e.message : 'GIF indisponibles';
-    } finally {
-      loadingGifs = false;
-    }
-  }
-
-  function togglePicker() {
-    picking = !picking;
-    if (picking && gifs.length === 0) void searchGifs();
-  }
 </script>
 
 <div class="composer">
   {#if picking}
-    <div class="gif-picker">
-      <form class="row" onsubmit={searchGifs}>
-        <label class="sr-only" for="gif-search">Chercher un GIF</label>
-        <input id="gif-search" class="input" placeholder="Chercher un GIF…" bind:value={gifQuery} />
-        <button class="btn" disabled={loadingGifs}>Chercher</button>
-      </form>
-      {#if gifError}<p class="error">{gifError}</p>{/if}
-      <div class="gif-grid">
-        {#each gifs as g (g.id)}
-          <button
-            type="button"
-            onclick={() => {
-              gif = g;
-              picking = false;
-            }}
-          >
-            <img src={img(g.previewUrl)} alt={g.title || 'GIF'} loading="lazy" />
-          </button>
-        {/each}
-      </div>
-      <p class="muted powered">Via GIPHY</p>
-    </div>
+    <GifPicker
+      onPick={(g) => {
+        gif = g;
+        picking = false;
+        textarea?.focus();
+      }}
+      onClose={() => (picking = false)}
+    />
   {/if}
 
   {#if gif}
     <div class="attached">
       <img src={img(gif.previewUrl)} alt={gif.title || 'GIF'} />
-      <button type="button" class="btn small ghost" onclick={() => (gif = null)}>Retirer le GIF</button>
+      <button type="button" class="btn small" onclick={() => (picking = true)}>Changer</button>
+      <button type="button" class="btn small ghost" onclick={() => (gif = null)}>Retirer</button>
     </div>
   {/if}
 
-  <form class="row" onsubmit={send}>
+  <form class="box" onsubmit={send}>
+    <div class="anchor">
+      {#if editingPosition}
+        <label class="sr-only" for="comment-position">Position du commentaire (0 à {max})</label>
+        <input
+          id="comment-position"
+          class="position-input"
+          type="number"
+          min="0"
+          {max}
+          bind:value={positionDraft}
+          bind:this={positionInput}
+          onkeydown={onPositionKey}
+          onblur={commitPosition}
+        />
+      {:else}
+        <button
+          type="button"
+          class="chip"
+          title="Changer la position du commentaire"
+          aria-label="Position : {positionText(unit, position)}. Cliquer pour changer"
+          onclick={openPosition}
+        >
+          {positionText(unit, position)}
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>
+        </button>
+      {/if}
+    </div>
     <label class="sr-only" for="comment-text">Commentaire</label>
     <textarea
       id="comment-text"
-      class="input"
       rows="1"
       maxlength="1000"
-      placeholder="Commenter · {anchorLabel}"
+      placeholder="Écrire un commentaire…"
       bind:value={text}
+      bind:this={textarea}
       onkeydown={onKey}
     ></textarea>
-    <button type="button" class="btn" aria-expanded={picking} onclick={togglePicker}>GIF</button>
+    <button type="button" class="btn gif-btn" class:on={picking} aria-pressed={picking} onclick={() => (picking = !picking)}>
+      GIF
+    </button>
     <button class="btn primary" disabled={sending || (!text.trim() && !gif)}>Envoyer</button>
   </form>
   {#if error}<p class="error">{error}</p>{/if}
@@ -115,58 +153,84 @@
     flex-direction: column;
     gap: 8px;
   }
-  .row {
+  .box {
     display: flex;
-    gap: 8px;
     align-items: flex-end;
+    gap: 8px;
+    padding: 6px;
+    border-radius: 10px;
+    border: 1px solid var(--border-strong);
+    background: var(--bg);
+  }
+  .box:focus-within {
+    border-color: #5a5e6a;
+  }
+  .anchor {
+    flex-shrink: 0;
+    align-self: center;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 10px;
+    border-radius: 16px;
+    border: 1px solid var(--me);
+    background: rgba(106, 169, 255, 0.12);
+    color: var(--me);
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .chip:hover {
+    background: rgba(106, 169, 255, 0.22);
+  }
+  .position-input {
+    width: 84px;
+    height: 32px;
+    padding: 0 8px;
+    border-radius: 16px;
+    border: 1px solid var(--me);
+    background: var(--surface);
   }
   textarea {
-    min-height: 44px;
+    flex: 1;
+    min-width: 0;
+    min-height: 32px;
     max-height: 160px;
-  }
-  .gif-picker {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 10px;
-    border-radius: 10px;
-    background: var(--surface-2);
-  }
-  .gif-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
-    gap: 6px;
-    max-height: 240px;
-    overflow-y: auto;
-  }
-  .gif-grid button {
-    padding: 0;
+    padding: 6px 4px;
     border: 0;
-    border-radius: 6px;
-    overflow: hidden;
-    background: var(--bg);
-    height: 96px;
+    background: transparent;
+    resize: none;
+    align-self: center;
   }
-  .gif-grid img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+  textarea:focus-visible {
+    outline: none;
+  }
+  .gif-btn.on {
+    border-color: var(--accent);
+    color: var(--accent);
   }
   .attached {
     display: flex;
-    gap: 10px;
+    gap: 8px;
     align-items: center;
   }
   .attached img {
     height: 72px;
     border-radius: 6px;
   }
-  .powered {
-    margin: 0;
-    font-size: 11px;
-    text-align: right;
-  }
   p {
     margin: 0;
+  }
+  @media (max-width: 520px) {
+    .box {
+      flex-wrap: wrap;
+    }
+    textarea {
+      flex-basis: 100%;
+      order: -1;
+    }
   }
 </style>

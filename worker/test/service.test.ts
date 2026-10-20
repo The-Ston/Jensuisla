@@ -110,6 +110,20 @@ describe('Service', () => {
     expect(view.participants.find((p) => p.userId === BRUNO)?.progress).toBe(2);
   });
 
+  it('edits text and GIF of a comment', async () => {
+    const book = await createBook(ctx.service);
+    await ctx.service.setProgress(ALICE, book.id, 3, null);
+    const gif = { id: 'g', url: 'https://media1.giphy.com/a.gif', previewUrl: 'https://media1.giphy.com/b.gif', width: 1, height: 1, title: 't' };
+    const c = await ctx.service.addComment(ALICE, book.id, { position: 2, text: 'hello', gif });
+
+    await ctx.service.editComment(ALICE, book.id, c.id, 'hi'); // keeps the GIF
+    expect(ctx.store.readings.get(book.id)!.comments.get(c.id)).toMatchObject({ text: 'hi', gif: { id: 'g' } });
+    await ctx.service.editComment(ALICE, book.id, c.id, 'hi', null); // removes it
+    expect(ctx.store.readings.get(book.id)!.comments.get(c.id)?.gif).toBeNull();
+    await expect(ctx.service.editComment(ALICE, book.id, c.id, '', null)).rejects.toThrow(/invalide/);
+    await expect(ctx.service.editComment(BRUNO, book.id, c.id, 'x')).rejects.toThrow(HttpError);
+  });
+
   it('converts a personal edition to the reference edition', async () => {
     const book = await createBook(ctx.service, 'page', 352);
     await ctx.service.setProgress(BRUNO, book.id, 120, 410);

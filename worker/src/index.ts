@@ -111,7 +111,14 @@ function toOp(method: string, parts: string[], data: Record<string, any>): Op | 
     }
   }
   if (sub === 'comments' && subId) {
-    if (method === 'PATCH' && !subSub) return { op: 'editComment', readingId: id, commentId: subId, text: String(data.text ?? '') };
+    if (method === 'PATCH' && !subSub)
+      return {
+        op: 'editComment',
+        readingId: id,
+        commentId: subId,
+        text: String(data.text ?? ''),
+        gif: 'gif' in data ? (data.gif ?? null) : undefined,
+      };
     if (method === 'DELETE' && !subSub) return { op: 'deleteComment', readingId: id, commentId: subId };
     if (method === 'POST' && subSub === 'reactions')
       return { op: 'react', readingId: id, commentId: subId, emoji: String(data.emoji ?? '') };

@@ -51,8 +51,9 @@ export const api = {
   visited: (id: string) => call<null>('POST', `${r(id)}/visited`),
   comment: (id: string, input: { position: number; text: string; gif: Gif | null }) =>
     call<ReadingView>('POST', `${r(id)}/comments`, input),
-  editComment: (id: string, commentId: string, text: string) =>
-    call<ReadingView>('PATCH', `${r(id)}/comments/${commentId}`, { text }),
+  /** `gif`: undefined keeps the current GIF, null removes it. */
+  editComment: (id: string, commentId: string, text: string, gif?: Gif | null) =>
+    call<ReadingView>('PATCH', `${r(id)}/comments/${commentId}`, gif === undefined ? { text } : { text, gif }),
   deleteComment: (id: string, commentId: string) => call<ReadingView>('DELETE', `${r(id)}/comments/${commentId}`),
   react: (id: string, commentId: string, emoji: string) =>
     call<ReadingView>('POST', `${r(id)}/comments/${commentId}/reactions`, { emoji }),

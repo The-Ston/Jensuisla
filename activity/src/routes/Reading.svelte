@@ -39,6 +39,12 @@
     return view.comments.filter((c) => c.position === myProgress);
   });
   const anchor = $derived(selectedPoint ? selectedPoint.end : myProgress);
+  // Position used by the composer: follows the selection, but the reader can change it.
+  let composerPosition = $state(0);
+  let composer: { focus: () => void } | undefined = $state();
+  $effect(() => {
+    composerPosition = anchor;
+  });
   const readers = $derived(
     view
       ? view.participants.map((p) => ({
@@ -131,8 +137,13 @@
     }
   }
 
-  const sendComment = (text: string, gif: Gif | null) =>
-    mutate(() => api.comment(id, { position: anchor, text, gif }));
+  const sendComment = (text: string, gif: Gif | null, position: number) =>
+    mutate(() => api.comment(id, { position, text, gif }));
+
+  function replyTo(position: number) {
+    composerPosition = position;
+    composer?.focus();
+  }
 
   function step(delta: number) {
     const target = points[selectedIndex + delta] ?? (delta < 0 && selected !== 'all' && selectedIndex === -1 ? points[points.length - 1] : undefined);
@@ -241,7 +252,8 @@
               meId={view.viewerId}
               canModerate={reading.organizerId === view.viewerId}
               onReact={(emoji) => mutate(() => api.react(id, comment.id, emoji))}
-              onEdit={(text) => mutate(() => api.editComment(id, comment.id, text))}
+              onReply={() => replyTo(comment.position)}
+              onEdit={(text, gif) => mutate(() => api.editComment(id, comment.id, text, gif))}
               onDelete={() => mutate(() => api.deleteComment(id, comment.id))}
             />
           {:else}
@@ -254,7 +266,13 @@
           {/if}
         </div>
 
-        <Composer anchorLabel={positionText(reading.unit, anchor)} onSend={sendComment} />
+        <Composer
+          bind:this={composer}
+          bind:position={composerPosition}
+          unit={reading.unit}
+          max={myProgress}
+          onSend={sendComment}
+        />
       </section>
     {/if}
 

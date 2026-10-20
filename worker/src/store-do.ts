@@ -24,7 +24,7 @@ export type Op =
   | { op: 'undo'; readingId: string }
   | { op: 'visited'; readingId: string }
   | { op: 'comment'; readingId: string; position: number; text: string; gif: Gif | null }
-  | { op: 'editComment'; readingId: string; commentId: string; text: string }
+  | { op: 'editComment'; readingId: string; commentId: string; text: string; gif?: Gif | null }
   | { op: 'deleteComment'; readingId: string; commentId: string }
   | { op: 'react'; readingId: string; commentId: string; emoji: string }
   | { op: 'notify'; pref: NotifyPref };
@@ -145,7 +145,7 @@ export class JensuislaStore extends DurableObject<Env> {
         await s.addComment(userId, op.readingId, op);
         break;
       case 'editComment':
-        await s.editComment(userId, op.readingId, op.commentId, op.text);
+        await s.editComment(userId, op.readingId, op.commentId, op.text, op.gif);
         break;
       case 'deleteComment':
         await s.deleteComment(userId, op.readingId, op.commentId);
