@@ -1,0 +1,27 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "jensuisla",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "observability": { "enabled": true },
+  // The Activity (Svelte build) is served as static assets; API and interactions hit the Worker.
+  "assets": {
+    "directory": "../activity/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/interactions"]
+  },
+  // Single Durable Object: serializes every write and caches data loaded from Discord.
+  // It keeps nothing in its own storage: Discord channels are the only source of truth.
+  "durable_objects": {
+    "bindings": [{ "name": "STORE", "class_name": "JensuislaStore" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["JensuislaStore"] }],
+  "vars": {
+    "DISCORD_APPLICATION_ID": "1562056322105614417",
+    "DISCORD_PUBLIC_KEY": "9fc7f71ae2fb79f3d135cd392dce88b9d93f5ccc4177c5fffe2cdb73c48c631c",
+    "DISCORD_GUILD_ID": "1561737376995217599",
+    "ORGANIZER_ROLE_ID": "1562055535786721391",
+    "LAUNCH_CHANNEL_ID": "1562055832823136286"
+  }
+}

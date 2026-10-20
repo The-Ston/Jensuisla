@@ -1,0 +1,21 @@
+{
+  "name": "jensuisla",
+  "private": true,
+  "description": "Shared reading Discord Activity with progress-gated discussions",
+  "workspaces": [
+    "activity",
+    "worker"
+  ],
+  "scripts": {
+    "build": "npm run build -w activity",
+    "dev:activity": "npm run dev -w activity",
+    "dev:worker": "npm run dev -w worker",
+    "test": "npm test -w worker",
+    "check": "npm run check -w activity && npm run check -w worker",
+    "deploy": "npm run build && npm run deploy -w worker"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "workerd@1.20261019.1": true
+  }
+}
