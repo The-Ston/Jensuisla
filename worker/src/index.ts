@@ -112,6 +112,7 @@ function toOp(method: string, parts: string[], data: Record<string, any>): Op | 
           position: Number(data.position),
           text: String(data.text ?? ''),
           gif: data.gif ?? null,
+          replyTo: typeof data.replyTo === 'string' ? data.replyTo : null,
         };
     }
   }

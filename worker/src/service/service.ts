@@ -256,7 +256,7 @@ export class Service {
   async addComment(
     userId: string,
     readingId: string,
-    input: { position: number; text: string; gif: Gif | null },
+    input: { position: number; text: string; gif: Gif | null; replyTo?: string | null },
   ): Promise<Comment> {
     const entry = this.entry(readingId);
     const me = this.participant(entry, userId);
@@ -267,21 +267,29 @@ export class Service {
     if (!text && !gif) throw new HttpError(400, 'Commentaire vide');
     if (text.length > MAX_COMMENT_LENGTH) throw new HttpError(400, 'Commentaire trop long');
 
+    // A reply quotes its original: placing it earlier would reveal the original to readers
+    // who have not reached it yet.
+    const original = input.replyTo ? this.visibleComment(entry, userId, input.replyTo) : null;
+    if (original && input.position < original.position)
+      throw new HttpError(400, 'Une réponse ne peut pas être placée avant le message d’origine');
+
     const comment = await this.store.createComment(readingId, {
       authorId: userId,
       position: input.position,
       text,
       gif,
       reactions: {},
+      replyTo: original?.id ?? null,
       createdAt: this.now(),
       editedAt: null,
     });
     this.deps.onEvent({
       readingId,
-      kind: gif && !text ? 'gif' : 'comment',
+      kind: original ? 'reply' : gif && !text ? 'gif' : 'comment',
       actorId: userId,
       position: comment.position,
       excerpt: text.slice(0, 120),
+      targetAuthorId: original?.authorId,
     });
     return comment;
   }

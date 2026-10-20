@@ -185,6 +185,29 @@ describe('Service', () => {
     await ctx.service.toggleReaction(ALICE, book.id, c.id, faces[20]!);
   });
 
+  it('links replies to their original and never places them earlier', async () => {
+    const book = await createBook(ctx.service);
+    await ctx.service.setProgress(ALICE, book.id, 13, null);
+    await ctx.service.setProgress(BRUNO, book.id, 10, null);
+    const original = await ctx.service.addComment(ALICE, book.id, { position: 8, text: 'wow', gif: null });
+
+    await expect(
+      ctx.service.addComment(BRUNO, book.id, { position: 5, text: 'avant', gif: null, replyTo: original.id }),
+    ).rejects.toThrow(/avant le message/);
+    const reply = await ctx.service.addComment(BRUNO, book.id, { position: 9, text: 'oui', gif: null, replyTo: original.id });
+    expect(reply.replyTo).toBe(original.id);
+
+    // Cannot reply to something you cannot see.
+    const ahead = await ctx.service.addComment(ALICE, book.id, { position: 12, text: 'plus loin', gif: null });
+    await expect(
+      ctx.service.addComment(BRUNO, book.id, { position: 10, text: 'x', gif: null, replyTo: ahead.id }),
+    ).rejects.toThrow(/introuvable/);
+
+    const out = buildNotifications(ctx.events, ctx.store, (id) => id, () => 'dm');
+    const toAlice = out.find((o) => o.kind === 'dm' && o.userId === ALICE);
+    expect(toAlice?.content).toContain('bruno t’a répondu au chapitre 9 : « oui »');
+  });
+
   it('converts a personal edition to the reference edition', async () => {
     const book = await createBook(ctx.service, 'page', 352);
     await ctx.service.setProgress(BRUNO, book.id, 120, 410);

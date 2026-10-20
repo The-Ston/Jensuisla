@@ -54,6 +54,8 @@ export interface Comment {
   gif: Gif | null;
   /** emoji -> user ids */
   reactions: Record<string, string[]>;
+  /** Comment this one answers. Optional for records written before replies existed. */
+  replyTo?: string | null;
   createdAt: number;
   editedAt: number | null;
 }

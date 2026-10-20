@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { onDestroy, onMount } from 'svelte';
-  import type { Gif, MemberView, ReadingView } from '$shared/api-types';
+  import { onDestroy, onMount, tick, untrack } from 'svelte';
+  import type { Comment, Gif, MemberView, ReadingView } from '$shared/api-types';
   import Avatar from '../components/Avatar.svelte';
   import CommentItem from '../components/CommentItem.svelte';
   import Composer from '../components/Composer.svelte';
@@ -42,10 +42,17 @@
   const anchor = $derived(selectedPoint ? selectedPoint.end : myProgress);
   // Position used by the composer: follows the selection, but the reader can change it.
   let composerPosition = $state(0);
+  let composerReply = $state<Comment | null>(null);
   let composer: { focus: () => void } | undefined = $state();
   $effect(() => {
-    composerPosition = anchor;
+    // A reply can't move before its original, even when another point is selected.
+    composerPosition = Math.max(anchor, untrack(() => composerReply?.position ?? 0));
   });
+  const commentsById = $derived(new Map((view?.comments ?? []).map((c) => [c.id, c])));
+  // Originals are always visible when their reply is: a reply is never placed before them.
+  const originalOf = (c: Comment) => (c.replyTo ? (commentsById.get(c.replyTo) ?? null) : undefined);
+  let highlightedId = $state<string | null>(null);
+  let highlightTimer: ReturnType<typeof setTimeout> | undefined;
   const readers = $derived(
     view
       ? view.participants.map((p) => ({
@@ -88,6 +95,7 @@
 
   onDestroy(() => {
     clearInterval(timer);
+    clearTimeout(highlightTimer);
     if (toast) clearTimeout(toast.timer);
   });
 
@@ -140,12 +148,24 @@
     }
   }
 
-  const sendComment = (text: string, gif: Gif | null, position: number) =>
-    mutate(() => api.comment(id, { position, text, gif }));
+  const sendComment = (text: string, gif: Gif | null, position: number, replyTo: string | null) =>
+    mutate(() => api.comment(id, { position, text, gif, replyTo }));
 
-  function replyTo(position: number) {
-    composerPosition = position;
+  function replyTo(comment: Comment) {
+    composerReply = comment;
+    composerPosition = comment.position;
     composer?.focus();
+  }
+
+  /** Shows the original of a reply: selects its point, scrolls to it and flashes it. */
+  async function jumpTo(commentId: string) {
+    const point = points.find((p) => p.comments.some((c) => c.id === commentId));
+    if (point && selected !== 'all') select(point.start);
+    await tick();
+    document.getElementById(`comment-${commentId}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    clearTimeout(highlightTimer);
+    highlightedId = commentId;
+    highlightTimer = setTimeout(() => (highlightedId = null), 1600);
   }
 
   function step(delta: number) {
@@ -260,7 +280,10 @@
               meId={view.viewerId}
               canModerate={reading.organizerId === view.viewerId}
               onReact={(emoji) => mutate(() => api.react(id, comment.id, emoji))}
-              onReply={() => replyTo(comment.position)}
+              original={originalOf(comment)}
+              highlighted={highlightedId === comment.id}
+              onJump={jumpTo}
+              onReply={() => replyTo(comment)}
               onEdit={(text, gif) => mutate(() => api.editComment(id, comment.id, text, gif))}
               onDelete={() => mutate(() => api.deleteComment(id, comment.id))}
             />
@@ -277,6 +300,8 @@
         <Composer
           bind:this={composer}
           bind:position={composerPosition}
+          bind:replyTo={composerReply}
+          replyAuthor={composerReply ? (view.members[composerReply.authorId]?.name ?? '') : ''}
           unit={reading.unit}
           max={myProgress}
           onSend={sendComment}

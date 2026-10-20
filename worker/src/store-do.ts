@@ -24,7 +24,7 @@ export type Op =
   | { op: 'progress'; readingId: string; value: number; editionTotal: number | null }
   | { op: 'undo'; readingId: string }
   | { op: 'visited'; readingId: string }
-  | { op: 'comment'; readingId: string; position: number; text: string; gif: Gif | null }
+  | { op: 'comment'; readingId: string; position: number; text: string; gif: Gif | null; replyTo: string | null }
   | { op: 'editComment'; readingId: string; commentId: string; text: string; gif?: Gif | null }
   | { op: 'deleteComment'; readingId: string; commentId: string }
   | { op: 'react'; readingId: string; commentId: string; emoji: string }

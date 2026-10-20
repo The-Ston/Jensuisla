@@ -53,7 +53,7 @@ export const api = {
     call<ReadingView>('POST', `${r(id)}/progress`, { value, editionTotal }),
   undo: (id: string) => call<ReadingView>('POST', `${r(id)}/undo`),
   visited: (id: string) => call<null>('POST', `${r(id)}/visited`),
-  comment: (id: string, input: { position: number; text: string; gif: Gif | null }) =>
+  comment: (id: string, input: { position: number; text: string; gif: Gif | null; replyTo: string | null }) =>
     call<ReadingView>('POST', `${r(id)}/comments`, input),
   /** `gif`: undefined keeps the current GIF, null removes it. */
   editComment: (id: string, commentId: string, text: string, gif?: Gif | null) =>

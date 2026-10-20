@@ -17,6 +17,9 @@
     unit,
     meId,
     canModerate,
+    original,
+    highlighted = false,
+    onJump,
     onReact,
     onReply,
     onEdit,
@@ -27,6 +30,10 @@
     unit: ProgressUnit;
     meId: string;
     canModerate: boolean;
+    /** The comment this one replies to: undefined if not a reply, null if it was deleted. */
+    original: Comment | null | undefined;
+    highlighted?: boolean;
+    onJump: (commentId: string) => void;
     onReact: (emoji: string) => Promise<void>;
     /** Prepares the composer to answer at this comment's position. */
     onReply: () => void;
@@ -109,7 +116,21 @@
   }
 </script>
 
-<article class:editing>
+<article id="comment-{comment.id}" class:editing class:highlighted class:reply={original !== undefined}>
+  {#if original !== undefined}
+    <div class="quote">
+      <span class="elbow" aria-hidden="true"></span>
+      {#if original}
+        <button class="quote-link" title="Aller au message d’origine" onclick={() => onJump(original.id)}>
+          <Avatar member={members[original.authorId]} size={16} />
+          <strong>{members[original.authorId]?.name ?? 'Ancien membre'}</strong>
+          <span class="excerpt">{original.text || (original.gif ? 'GIF' : '')}</span>
+        </button>
+      {:else}
+        <span class="muted deleted">Message supprimé</span>
+      {/if}
+    </div>
+  {/if}
   <Avatar member={author} size={36} />
   <div class="body">
     <div class="meta">
@@ -243,6 +264,70 @@
   }
   article.editing {
     background: var(--surface-2);
+  }
+  article.reply {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+  article.highlighted {
+    animation: flash 1.6s ease-out;
+  }
+  @keyframes flash {
+    0%,
+    40% {
+      background: rgba(232, 163, 61, 0.22);
+    }
+    100% {
+      background: transparent;
+    }
+  }
+  /* Discord-like quote line above a reply. */
+  .quote {
+    flex-basis: 100%;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding-left: 18px;
+    min-width: 0;
+  }
+  .elbow {
+    width: 22px;
+    height: 10px;
+    margin-top: 8px;
+    border-left: 2px solid var(--border-strong);
+    border-top: 2px solid var(--border-strong);
+    border-top-left-radius: 6px;
+    flex-shrink: 0;
+  }
+  .quote-link {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    min-height: 24px;
+    padding: 0 4px;
+    border: 0;
+    border-radius: 4px;
+    background: none;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .quote-link:hover {
+    color: var(--text);
+  }
+  .quote-link strong {
+    color: var(--text);
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+  .excerpt {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .deleted {
+    font-size: 12px;
+    font-style: italic;
   }
   .body {
     display: flex;

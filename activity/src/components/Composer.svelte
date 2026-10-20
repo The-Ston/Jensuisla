@@ -1,6 +1,6 @@
 <script lang="ts">
   import { tick } from 'svelte';
-  import type { Gif, ProgressUnit } from '$shared/api-types';
+  import type { Comment, Gif, ProgressUnit } from '$shared/api-types';
   import { img, positionText } from '../lib/format';
   import GifPicker from './GifPicker.svelte';
 
@@ -8,14 +8,22 @@
     unit,
     max,
     position = $bindable(),
+    replyTo = $bindable(),
+    replyAuthor = '',
     onSend,
   }: {
     unit: ProgressUnit;
     /** Furthest position the reader may write at (their progress). */
     max: number;
     position: number;
-    onSend: (text: string, gif: Gif | null, position: number) => Promise<void>;
+    /** Comment being answered, if any. */
+    replyTo: Comment | null;
+    replyAuthor?: string;
+    onSend: (text: string, gif: Gif | null, position: number, replyTo: string | null) => Promise<void>;
   } = $props();
+
+  // A reply may not be placed before the message it answers (it would reveal it too early).
+  const min = $derived(replyTo ? replyTo.position : 0);
 
   let text = $state('');
   let gif = $state<Gif | null>(null);
@@ -41,7 +49,7 @@
 
   function commitPosition() {
     if (!editingPosition) return;
-    if (Number.isFinite(positionDraft)) position = Math.max(0, Math.min(max, Math.round(positionDraft)));
+    if (Number.isFinite(positionDraft)) position = Math.max(min, Math.min(max, Math.round(positionDraft)));
     editingPosition = false;
     textarea?.focus();
   }
@@ -63,9 +71,10 @@
     sending = true;
     error = '';
     try {
-      await onSend(text, gif, position);
+      await onSend(text, gif, Math.max(min, position), replyTo?.id ?? null);
       text = '';
       gif = null;
+      replyTo = null;
     } catch (e) {
       error = e instanceof Error ? e.message : 'Envoi impossible';
     } finally {
@@ -77,6 +86,9 @@
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       (event.currentTarget as HTMLTextAreaElement).form?.requestSubmit();
+    } else if (event.key === 'Escape' && replyTo) {
+      event.preventDefault();
+      replyTo = null;
     }
   }
 </script>
@@ -101,15 +113,22 @@
     </div>
   {/if}
 
-  <form class="box" onsubmit={send}>
+  {#if replyTo}
+    <div class="replying">
+      <span>Réponse à <strong>{replyAuthor || 'ce message'}</strong></span>
+      <button type="button" class="cancel-reply" aria-label="Annuler la réponse" title="Annuler la réponse (Échap)" onclick={() => (replyTo = null)}>✕</button>
+    </div>
+  {/if}
+
+  <form class="box" class:with-reply={!!replyTo} onsubmit={send}>
     <div class="anchor">
       {#if editingPosition}
-        <label class="sr-only" for="comment-position">Position du commentaire (0 à {max})</label>
+        <label class="sr-only" for="comment-position">Position du commentaire ({min} à {max})</label>
         <input
           id="comment-position"
           class="position-input"
           type="number"
-          min="0"
+          {min}
           {max}
           bind:value={positionDraft}
           bind:this={positionInput}
@@ -164,6 +183,34 @@
   }
   .box:focus-within {
     border-color: #5a5e6a;
+  }
+  .box.with-reply {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    margin-top: -8px;
+  }
+  .replying {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 6px 4px 12px;
+    border-radius: 10px 10px 0 0;
+    border: 1px solid var(--border-strong);
+    border-bottom: 0;
+    background: var(--surface-2);
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .replying strong {
+    color: var(--text);
+  }
+  .cancel-reply {
+    width: 28px;
+    height: 28px;
+    border: 0;
+    border-radius: 50%;
+    background: var(--border-strong);
+    font-size: 12px;
   }
   .anchor {
     flex-shrink: 0;

@@ -5,11 +5,13 @@ import type { DataStore } from '../store/data-store';
 
 export interface NotifyEvent {
   readingId: string;
-  kind: 'comment' | 'gif' | 'reaction';
+  kind: 'comment' | 'gif' | 'reaction' | 'reply';
   actorId: string;
   position: number;
   /** Comment excerpt, or the emoji for a reaction. */
   excerpt: string;
+  /** Author of the comment being replied to. */
+  targetAuthorId?: string;
 }
 
 export type Outgoing =
@@ -31,16 +33,18 @@ export function positionLabel(unit: ProgressUnit, position: number): string {
   }
 }
 
-function describe(event: NotifyEvent, actor: string, where: string, withExcerpt: boolean): string {
+/** `target` is "toi" when the recipient is the one being answered, else their name. */
+function describe(event: NotifyEvent, actor: string, where: string, withExcerpt: boolean, target: string): string {
+  const excerpt = withExcerpt && event.excerpt ? ` : « ${event.excerpt} »` : '';
   switch (event.kind) {
     case 'reaction':
       return `${actor} a réagi ${event.excerpt} ${where}`;
     case 'gif':
       return `${actor} a posté un GIF ${where}`;
     case 'comment':
-      return withExcerpt && event.excerpt
-        ? `${actor} a commenté ${where} : « ${event.excerpt} »`
-        : `${actor} a commenté ${where}`;
+      return `${actor} a commenté ${where}${excerpt}`;
+    case 'reply':
+      return target === 'toi' ? `${actor} t’a répondu ${where}${excerpt}` : `${actor} a répondu à ${target} ${where}${excerpt}`;
   }
 }
 
@@ -79,7 +83,13 @@ export function buildNotifications(
       if (relevant.length === 0) continue;
       if (pref === 'dm') {
         const lines = relevant.map((e) =>
-          describe(e, nameOf(e.actorId), positionLabel(unit, fromReference(e.position, p.editionTotal, total)), true),
+          describe(
+            e,
+            nameOf(e.actorId),
+            positionLabel(unit, fromReference(e.position, p.editionTotal, total)),
+            true,
+            e.targetAuthorId === p.userId ? 'toi' : nameOf(e.targetAuthorId ?? ''),
+          ),
         );
         out.push({ kind: 'dm', userId: p.userId, content: render(title, lines) });
       } else {
@@ -89,7 +99,10 @@ export function buildNotifications(
 
     if (mentionIds.size > 0) {
       // Visible to the whole channel: no excerpts, only who did what where.
-      for (const e of readingEvents) channelLines.push(describe(e, nameOf(e.actorId), positionLabel(unit, e.position), false));
+      for (const e of readingEvents)
+        channelLines.push(
+          describe(e, nameOf(e.actorId), positionLabel(unit, e.position), false, nameOf(e.targetAuthorId ?? '')),
+        );
       const mentions = [...mentionIds].map((id) => `<@${id}>`).join(' ');
       out.push({ kind: 'channel', content: `${render(title, channelLines)}\n${mentions}`, mentionIds: [...mentionIds] });
     }
