@@ -18,7 +18,8 @@
   let coverUrl = $state<string | null>(null);
   let coverData = $state<{ base64: string; contentType: string } | null>(null);
   let coverPreview = $state<string | null>(null);
-  let unit = $state<ProgressUnit>('chapter');
+  // Pages first: book search can fill their count, never the chapters'.
+  let unit = $state<ProgressUnit>('page');
   let total = $state<number | null>(null);
   let joinMode = $state<JoinMode>('both');
   let invited = $state<string[]>([]);
@@ -193,7 +194,7 @@
     <fieldset>
       <legend>Comment mesure-t-on l’avancement ?</legend>
       <div class="choices">
-        {#each ['chapter', 'page', 'percent'] as const as u (u)}
+        {#each ['page', 'chapter', 'percent'] as const as u (u)}
           <label class="choice" class:active={unit === u}>
             <input type="radio" name="unit" value={u} checked={unit === u} onchange={() => onUnitChange(u)} />
             {unitNames[u]}

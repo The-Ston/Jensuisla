@@ -84,7 +84,13 @@
   });
   const readerRows = $derived(Math.max(1, ...groups.map((g) => g.row + 1)));
 
+  // Chapter readings get one graduation per chapter, numbered under the line when there's room.
+  const chapters = $derived(scale.unit === 'chapter' ? scale.total : 0);
+  const numberEvery = $derived(chapters && width ? Math.ceil(20 / (width / chapters)) : 1);
+  const tickSpace = $derived(chapters ? 16 : 0);
+
   const lineTop = $derived(labelRows * LABEL_ROW + 14);
+  const readersTop = $derived(lineTop + 10 + tickSpace);
   const label = (p: TimelinePoint) => rangeLabel(scale, p.start, p.end);
 </script>
 
@@ -92,8 +98,8 @@
   <div
     class="timeline"
     bind:clientWidth={width}
-    style:min-width="{Math.max(320, Math.min(points.length * 60, 1600))}px"
-    style:height="{lineTop + 10 + readerRows * READER_ROW}px"
+    style:min-width="{Math.max(320, Math.min(Math.max(points.length * 60, chapters * 14), 1600))}px"
+    style:height="{readersTop + readerRows * READER_ROW}px"
   >
     {#each labels as l (l.point.start)}
       {@const top = l.row * LABEL_ROW}
@@ -117,8 +123,15 @@
     <div class="track" style:top="{lineTop}px"></div>
     <div class="fill" style:top="{lineTop}px" style:width="{x(myProgress)}px"></div>
 
+    {#each { length: chapters + 1 }, i (i)}
+      <span class="tick" class:read={i <= myProgress} style:left="{x(i)}px" style:top="{lineTop}px"></span>
+      {#if i > 0 && (i === 1 || i % numberEvery === 0)}
+        <span class="chapter" class:read={i <= myProgress} style:left="{x(i - 0.5)}px" style:top="{lineTop + 8}px">{i}</span>
+      {/if}
+    {/each}
+
     {#each groups as g (g.progress)}
-      {@const top = lineTop + 10 + g.row * READER_ROW}
+      {@const top = readersTop + g.row * READER_ROW}
       {#if g.row > 0}
         <span class="stem low" style:left="{g.anchor}px" style:top="{lineTop + 6}px" style:height="{top - lineTop - 6}px"></span>
       {/if}
@@ -197,6 +210,29 @@
   }
   .fill {
     background: var(--accent);
+  }
+  .tick {
+    position: absolute;
+    width: 2px;
+    height: 14px;
+    transform: translate(-50%, -50%);
+    border-radius: 1px;
+    background: var(--border-strong);
+  }
+  .tick.read {
+    background: var(--accent);
+  }
+  .chapter {
+    position: absolute;
+    transform: translateX(-50%);
+    font-size: 10px;
+    line-height: 1;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+  }
+  .chapter.read {
+    color: var(--accent);
   }
   .readers {
     position: absolute;
