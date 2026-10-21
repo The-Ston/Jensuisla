@@ -103,6 +103,38 @@ export class DiscordRest implements DiscordApi {
   createDm(userId: string) {
     return this.request<DiscordChannel>('POST', '/users/@me/channels', { recipient_id: userId });
   }
+
+  listCommands(applicationId: string) {
+    return this.request<ApplicationCommand[]>('GET', `/applications/${applicationId}/commands`);
+  }
+
+  editCommand(applicationId: string, commandId: string, body: Partial<ApplicationCommand>) {
+    return this.request<ApplicationCommand>('PATCH', `/applications/${applicationId}/commands/${commandId}`, body);
+  }
+
+  /** Pinned messages of a channel, newest first (first page only, which is plenty here). */
+  async listPins(channelId: string) {
+    const page = await this.request<{ items: { message: PinnedMessage }[] }>('GET', `/channels/${channelId}/messages/pins`);
+    return page.items.map((i) => i.message);
+  }
+
+  async pinMessage(channelId: string, messageId: string) {
+    await this.request<void>('PUT', `/channels/${channelId}/messages/pins/${messageId}`);
+  }
+}
+
+export interface ApplicationCommand {
+  id: string;
+  /** 4 = the Activity's entry point ("Lancer" in the Activity launcher). */
+  type: number;
+  /** For the entry point: 1 = the app answers the interaction, 2 = Discord launches and posts a message. */
+  handler?: number;
+}
+
+export interface PinnedMessage {
+  id: string;
+  author: { id: string };
+  components?: { components?: { custom_id?: string }[] }[];
 }
 
 /** Identifies the user behind an OAuth access token sent by the Activity. */

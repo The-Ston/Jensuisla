@@ -1,5 +1,6 @@
 import { searchBooks } from './books';
 import { isAllowedImage, TWEMOJI } from './discord/cdn';
+import { LAUNCH_ID } from './discord/launch';
 import { exchangeOAuthCode } from './discord/rest';
 import { verifyInteraction } from './discord/verify';
 import type { Env } from './env';
@@ -43,10 +44,11 @@ async function handleInteraction(request: Request, env: Env): Promise<Response> 
     raw,
   );
   if (!valid) return new Response('invalid signature', { status: 401 });
-  const interaction = JSON.parse(raw) as { type: number; data?: { custom_id?: string } };
+  const interaction = JSON.parse(raw) as { type: number; data?: { custom_id?: string; type?: number } };
   if (interaction.type === 1) return json({ type: 1 }); // PING -> PONG
-  // "Ouvrir Jensuisla" button on notifications: launch the Activity.
-  if (interaction.type === 3 && interaction.data?.custom_id === 'jsl:launch') return json({ type: 12 });
+  // Activity launcher's entry point, and the "Ouvrir Jensuisla" buttons: launch the Activity.
+  if (interaction.type === 2 && interaction.data?.type === 4) return json({ type: 12 });
+  if (interaction.type === 3 && interaction.data?.custom_id === LAUNCH_ID) return json({ type: 12 });
   return json({ type: 4, data: { content: 'Ouvre Jensuisla depuis le lanceur d’Activités.', flags: 64 } });
 }
 

@@ -1,6 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import type { CreateReadingInput } from './api-types';
 import { avatarUrl, proxied } from './discord/cdn';
+import { ensureLaunchSetup, OPEN_BUTTON } from './discord/launch';
 import { DiscordRest, fetchOAuthUser } from './discord/rest';
 import type { Gif, NotifyPref } from './domain/types';
 import type { Env } from './env';
@@ -72,6 +73,8 @@ export class JensuislaStore extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.api = new DiscordRest(env.DISCORD_BOT_TOKEN);
+    // Once per start: a failure is logged and retried at the next one.
+    void ensureLaunchSetup(this.api, env).catch((err) => console.error('launch setup failed', err));
   }
 
   private getService(): Promise<Service> {
@@ -259,9 +262,6 @@ export class JensuislaStore extends DurableObject<Env> {
         (id) => members.get(id)?.name ?? 'Quelqu’un',
         (id) => store.users.get(id)?.value.notify ?? DEFAULT_NOTIFY,
       );
-      const openButton = [
-        { type: 1, components: [{ type: 2, style: 1, label: 'Ouvrir Jensuisla', custom_id: 'jsl:launch' }] },
-      ];
       for (const m of messages) {
         try {
           if (m.kind === 'dm') {
@@ -273,13 +273,13 @@ export class JensuislaStore extends DurableObject<Env> {
             await this.api.createMessage(channelId, {
               content: m.content,
               allowed_mentions: { parse: [] },
-              components: openButton,
+              components: OPEN_BUTTON,
             });
           } else {
             await this.api.createMessage(this.env.LAUNCH_CHANNEL_ID, {
               content: m.content,
               allowed_mentions: { users: m.mentionIds },
-              components: openButton,
+              components: OPEN_BUTTON,
             });
           }
         } catch (err) {
