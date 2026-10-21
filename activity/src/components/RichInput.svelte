@@ -5,7 +5,7 @@
 
   /**
    * Text input where page mentions ("p.25", "page 25") turn into tags as you type, like options
-   * of a Discord bot command. A tag is deleted with one backspace. The value is plain text in
+   * of a Discord bot command. Backspace right after a tag turns it back into the text typed. The value is plain text in
    * which tags are stored as tokens holding the reference-edition page.
    */
   let {
@@ -30,7 +30,7 @@
   let lastValue: string | null = null;
 
   // "p.25", "p 25", "p25", "page 25", "pages 25", once followed by a space or punctuation.
-  const MENTION = /(^|[\s(«"'’])((?:p\.?|pages?)\s?(\d{1,5}))([\s.,;:!?)»"'’])/i;
+  const MENTION = /(?<=^|[\s(«"'’])(?:p\.?|pages?)\s?(\d{1,5})(?=[\s.,;:!?)»"'’])/gi;
   const pagesEnabled = $derived(scale.unit === 'page');
 
   export function focus() {
@@ -96,15 +96,14 @@
   }
 
   // Same, ending the text: only used when sending, as the mention can't be "finished" by typing.
-  const MENTION_AT_END = /(^|[\s(«"'’])((?:p\.?|pages?)\s?(\d{1,5}))()$/i;
+  const MENTION_AT_END = /(?<=^|[\s(«"'’])(?:p\.?|pages?)\s?(\d{1,5})$/i;
 
   /** Converts a mention left at the very end, then returns the final value. */
   export function finalize(): string {
     if (el && pagesEnabled) {
-      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-      let last: Text | null = null;
-      for (let node = walker.nextNode() as Text | null; node; node = walker.nextNode() as Text | null) last = node;
-      if (last && last === lastTextNode()) convertMention(last, MENTION_AT_END);
+      const last = lastTextNode();
+      const m = last && MENTION_AT_END.exec(last.data);
+      if (last && m && inBook(m)) replaceWithTag(last, m);
       sync();
     }
     return value;
@@ -117,36 +116,65 @@
     return node && node.nodeType === Node.TEXT_NODE ? (node as Text) : null;
   }
 
-  /** Turns the first complete page mention found into a tag. Returns true if it did. */
-  function convertMention(only?: Text, pattern = MENTION): boolean {
-    if (!el || !pagesEnabled) return false;
-    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-    for (let node = walker.nextNode() as Text | null; node; node = walker.nextNode() as Text | null) {
-      if (only && node !== only) continue;
-      const m = pattern.exec(node.data);
-      if (!m) continue;
-      const shown = Number(m[3]);
-      if (shown < 1 || shown > displayTotal(scale)) continue;
-      const start = m.index + m[1]!.length;
-      const after = node.splitText(start);
-      const rest = after.splitText(m[2]!.length); // rest starts with the delimiter
-      const tag = chip(fromDisplay(scale, shown), shown);
-      after.replaceWith(tag);
-      // Caret right after the delimiter that triggered the conversion.
-      const range = document.createRange();
-      range.setStart(rest, Math.min(1, rest.length));
-      range.collapse(true);
-      const sel = getSelection();
-      sel?.removeAllRanges();
-      sel?.addRange(range);
-      return true;
+  function inBook(m: RegExpMatchArray): boolean {
+    const shown = Number(m[1]);
+    return shown >= 1 && shown <= displayTotal(scale);
+  }
+
+  /** Replaces a mention matched in a text node with a tag. Returns the text node that followed it. */
+  function replaceWithTag(node: Text, m: RegExpMatchArray): Text {
+    const shown = Number(m[1]);
+    const after = node.splitText(m.index!);
+    const rest = after.splitText(m[0].length);
+    const tag = chip(fromDisplay(scale, shown), shown);
+    tag.dataset.typed = m[0];
+    after.replaceWith(tag);
+    return rest;
+  }
+
+  function caret(): { node: Text; offset: number } | null {
+    const sel = getSelection();
+    if (!sel || !sel.isCollapsed || sel.anchorNode?.nodeType !== Node.TEXT_NODE) return null;
+    return { node: sel.anchorNode as Text, offset: sel.anchorOffset };
+  }
+
+  function placeCaret(node: Text, offset: number) {
+    const range = document.createRange();
+    range.setStart(node, offset);
+    range.collapse(true);
+    const sel = getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+  }
+
+  // Where a paste started, so that every mention it contains gets converted.
+  let pasteFrom: { node: Text | null; offset: number } | null = null;
+
+  /**
+   * Turns into tags the mentions just finished before the caret: by the last character typed,
+   * or anywhere in the pasted text. Mentions elsewhere are left alone, so that a tag turned back
+   * into text stays text.
+   */
+  function convertBeforeCaret() {
+    if (!el || !pagesEnabled) return;
+    const at = caret();
+    if (!at) return;
+    const from = pasteFrom ? (pasteFrom.node === at.node ? pasteFrom.offset : 0) : at.offset - 1;
+    const found = [...at.node.data.slice(0, at.offset).matchAll(MENTION)].filter(
+      (m) => m.index! + m[0].length >= from && inBook(m),
+    );
+    // From the last one, so that earlier matches keep their offsets in the node left in front.
+    let caretAfter: { node: Text; offset: number } | null = null;
+    for (const m of found.reverse()) {
+      const rest = replaceWithTag(at.node, m);
+      caretAfter ??= { node: rest, offset: at.offset - m.index! - m[0].length };
     }
-    return false;
+    if (caretAfter) placeCaret(caretAfter.node, caretAfter.offset);
   }
 
   function onInput(event: Event) {
     // Never rewrite the text while a keyboard is composing (Android, accents…).
-    if (!(event as InputEvent).isComposing) while (convertMention()) {}
+    if (!(event as InputEvent).isComposing) convertBeforeCaret();
     sync();
   }
 
@@ -174,7 +202,9 @@
       const tag = tagBeforeCaret();
       if (tag) {
         event.preventDefault();
-        tag.remove();
+        const text = document.createTextNode(tag.dataset.typed ?? tag.textContent ?? '');
+        tag.replaceWith(text);
+        placeCaret(text, text.length);
         sync();
       }
     } else if (event.key === 'Enter' && event.shiftKey) {
@@ -187,7 +217,10 @@
     // Plain text only: no formatting or images pasted from elsewhere.
     event.preventDefault();
     const text = event.clipboardData?.getData('text/plain') ?? '';
+    // Not in a text node: the pasted text starts a new one, scanned from its start.
+    pasteFrom = caret() ?? { node: null, offset: 0 };
     document.execCommand('insertText', false, text);
+    pasteFrom = null;
   }
 
   onMount(() => {

@@ -80,9 +80,9 @@ describe('RichInput', () => {
     expect(el.querySelector('.page-chip')?.textContent).toBe('p. 120');
   });
 
-  it('deletes a whole tag with one backspace', () => {
+  it('turns a tag back into the text typed with one backspace', () => {
     const { el, props } = setup(reference);
-    type(el, 'vu p.25 ');
+    type(el, 'vu p25 ');
     // Caret right after the tag (before the space).
     const space = el.lastChild!;
     const range = document.createRange();
@@ -92,8 +92,18 @@ describe('RichInput', () => {
     getSelection()!.addRange(range);
     el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true, cancelable: true }));
     flushSync();
-    expect(props.value).toBe('vu  ');
+    expect(props.value).toBe('vu p25 ');
     expect(el.querySelector('.page-chip')).toBeNull();
+    // Typing elsewhere doesn't turn it into a tag again.
+    type(el, 'ok ');
+    expect(props.value).toBe('vu p25 ok ');
+    expect(el.querySelector('.page-chip')).toBeNull();
+  });
+
+  it('only converts the mention finished by the last character typed', () => {
+    const { el, props } = setup(reference);
+    type(el, 'p1 p2 ');
+    expect(props.value).toBe('p1 [[p:2]] ');
   });
 
   it('converts a mention left at the end when sending', () => {
