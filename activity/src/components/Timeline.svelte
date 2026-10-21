@@ -1,9 +1,13 @@
 <script lang="ts">
   import type { MemberView } from '$shared/api-types';
-  import { rangeLabel, scaleLabel, type Scale } from '../lib/scale';
+  import { rangeLabel, scaleLabel, toDisplay, type Scale } from '../lib/scale';
   import type { TimelinePoint } from '../lib/timeline';
   import Avatar from './Avatar.svelte';
 
+  /**
+   * Two lanes around the book's line: comment points above as labels, readers below with their
+   * names. Rows are stacked within each lane so that nothing overlaps.
+   */
   let {
     scale,
     points,
@@ -20,64 +24,136 @@
     onSelect: (key: number | 'here') => void;
   } = $props();
 
+  const LABEL_ROW = 30;
+  const READER_ROW = 46;
+  const GAP = 6;
+
+  let width = $state(0);
+
   // The timeline is proportional, so it looks the same in every edition.
   const total = $derived(scale.total);
-  const pct = (position: number) => (total > 0 ? (position / total) * 100 : 0);
+  const x = (position: number) => (total > 0 ? (position / total) * width : 0);
 
-  // Readers at the same position are spread slightly so every avatar stays visible.
-  const placed = $derived.by(() => {
-    const seen = new Map<number, number>();
-    return readers.map((r) => {
-      const index = seen.get(r.progress) ?? 0;
-      seen.set(r.progress, index + 1);
-      return { ...r, offset: index * 14 };
+  function short(position: number): string {
+    const n = toDisplay(scale, position);
+    return scale.unit === 'page' ? `p. ${n}` : scale.unit === 'chapter' ? `ch. ${n}` : `${n} %`;
+  }
+
+  /**
+   * Places boxes centered on their anchor, kept inside the line's width, each in the first row
+   * where it fits (or the row that frees up first).
+   */
+  function stack<T extends { anchor: number; size: number }>(items: T[], maxRows: number) {
+    const rowEnds: number[] = [];
+    return items.map((item) => {
+      const left = Math.max(0, Math.min(item.anchor - item.size / 2, width - item.size));
+      let row = rowEnds.findIndex((end) => end + GAP <= left);
+      if (row === -1) row = rowEnds.length < maxRows ? rowEnds.length : rowEnds.indexOf(Math.min(...rowEnds));
+      rowEnds[row] = left + item.size;
+      return { ...item, left, row };
     });
-  });
+  }
 
+  const labels = $derived(
+    stack(
+      points.map((p) => {
+        const text = `${short(p.start)} · ${p.count}`;
+        return { point: p, text, anchor: x(p.start), size: text.length * 7 + 20 };
+      }),
+      3,
+    ),
+  );
+  const labelRows = $derived(Math.max(1, ...labels.map((l) => l.row + 1)));
+
+  // Readers at the same position share one marker; mine comes first and selects "here".
+  const groups = $derived.by(() => {
+    const byProgress = new Map<number, typeof readers>();
+    for (const r of readers) byProgress.set(r.progress, [...(byProgress.get(r.progress) ?? []), r]);
+    if (!byProgress.has(myProgress)) byProgress.set(myProgress, []);
+    const list = [...byProgress.entries()]
+      .sort(([a], [b]) => a - b)
+      .map(([progress, rs]) => {
+        const sorted = [...rs].sort((a, b) => Number(b.isMe) - Number(a.isMe));
+        const isHere = progress === myProgress;
+        const names = sorted.map((r) => (r.isMe ? 'Toi' : r.member.name));
+        const text = names.length > 2 ? `${names[0]} +${names.length - 1}` : names.join(' · ') || 'Toi';
+        const avatars = sorted.slice(0, 3);
+        return { progress, readers: sorted, avatars, isHere, text, anchor: x(progress), size: Math.max(24 + (avatars.length - 1) * 14, Math.min(text.length * 6.5, 120)) + 8 };
+      });
+    return stack(list, 2);
+  });
+  const readerRows = $derived(Math.max(1, ...groups.map((g) => g.row + 1)));
+
+  const lineTop = $derived(labelRows * LABEL_ROW + 14);
   const label = (p: TimelinePoint) => rangeLabel(scale, p.start, p.end);
 </script>
 
 <div class="scroller">
-  <div class="timeline" style:min-width="{Math.max(320, Math.min(points.length * 44, 1400))}px">
-    {#each placed as r (r.member.id)}
-      <span class="reader" style:left="calc({pct(r.progress)}% + {r.offset}px)" title="{r.member.name} : {scaleLabel(scale, r.progress)}">
-        <Avatar member={r.member} size={24} ring={r.isMe ? 'var(--me)' : 'var(--surface)'} />
-      </span>
-    {/each}
-
-    <div class="track"></div>
-    <div class="fill" style:width="{pct(myProgress)}%"></div>
-    {#if myProgress < total}
-      <div class="locked" style:left="calc({pct(myProgress)}% + 18px)"><span>verrouillé</span></div>
-    {/if}
-
-    {#each points as p (p.start)}
-      {@const size = 24 + Math.min(p.count, 5) * 4}
+  <div
+    class="timeline"
+    bind:clientWidth={width}
+    style:min-width="{Math.max(320, Math.min(points.length * 60, 1600))}px"
+    style:height="{lineTop + 10 + readerRows * READER_ROW}px"
+  >
+    {#each labels as l (l.point.start)}
+      {@const top = l.row * LABEL_ROW}
+      <span class="stem" style:left="{l.anchor}px" style:top="{top + 22}px" style:height="{lineTop - top - 22}px"></span>
       <button
-        class="point"
-        class:selected={selected === p.start}
-        style:left="{pct(p.start)}%"
-        style:width="{size}px"
-        style:height="{size}px"
-        aria-label="{label(p)}, {p.count} message{p.count > 1 ? 's' : ''}{p.isNew ? ', nouveau' : ''}"
-        aria-pressed={selected === p.start}
-        onclick={() => onSelect(p.start)}
+        class="label"
+        class:selected={selected === l.point.start}
+        style:left="{l.left}px"
+        style:top="{top}px"
+        style:width="{l.size}px"
+        aria-label="{label(l.point)}, {l.point.count} message{l.point.count > 1 ? 's' : ''}{l.point.isNew ? ', nouveau' : ''}"
+        aria-pressed={selected === l.point.start}
+        title={label(l.point)}
+        onclick={() => onSelect(l.point.start)}
       >
-        {p.count}
-        {#if p.isNew}<span class="new" aria-hidden="true"></span>{/if}
+        {l.text}
+        {#if l.point.isNew}<span class="new" aria-hidden="true"></span>{/if}
       </button>
     {/each}
 
-    <button
-      class="here"
-      class:selected={selected === 'here'}
-      style:left="{pct(myProgress)}%"
-      aria-label="Ma position : {scaleLabel(scale, myProgress)}"
-      aria-pressed={selected === 'here'}
-      onclick={() => onSelect('here')}>ici</button
-    >
+    <div class="track" style:top="{lineTop}px"></div>
+    <div class="fill" style:top="{lineTop}px" style:width="{x(myProgress)}px"></div>
+
+    {#each groups as g (g.progress)}
+      {@const top = lineTop + 10 + g.row * READER_ROW}
+      {#if g.row > 0}
+        <span class="stem low" style:left="{g.anchor}px" style:top="{lineTop + 6}px" style:height="{top - lineTop - 6}px"></span>
+      {/if}
+      {#if g.isHere}
+        <button
+          class="readers here"
+          class:selected={selected === 'here'}
+          style:left="{g.left}px"
+          style:top="{top}px"
+          style:width="{g.size}px"
+          aria-label="Ma position : {scaleLabel(scale, g.progress)}"
+          aria-pressed={selected === 'here'}
+          onclick={() => onSelect('here')}
+        >
+          {@render faces(g)}
+        </button>
+      {:else}
+        <span class="readers" style:left="{g.left}px" style:top="{top}px" style:width="{g.size}px" title={g.readers.map((r) => r.member.name).join(', ') + ' : ' + scaleLabel(scale, g.progress)}>
+          {@render faces(g)}
+        </span>
+      {/if}
+    {/each}
   </div>
 </div>
+
+{#snippet faces(g: (typeof groups)[number])}
+  <span class="faces">
+    {#each g.avatars as r (r.member.id)}
+      <Avatar member={r.member} size={24} ring={r.isMe ? 'var(--me)' : 'var(--surface)'} />
+    {:else}
+      <span class="dot-me"></span>
+    {/each}
+  </span>
+  <span class="names">{g.text}</span>
+{/snippet}
 
 <style>
   .scroller {
@@ -86,21 +162,33 @@
   }
   .timeline {
     position: relative;
-    height: 96px;
     margin: 0 4px;
   }
-  .reader {
+  .stem {
     position: absolute;
-    top: 4px;
+    width: 2px;
     transform: translateX(-50%);
-    display: flex;
+    background: var(--border-strong);
+  }
+  .label {
+    position: absolute;
+    height: 22px;
+    padding: 0 6px;
+    border: 0;
+    border-radius: 11px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
   }
   .track,
   .fill {
     position: absolute;
     left: 0;
-    top: 52px;
     height: 4px;
+    margin-top: -2px;
     border-radius: 2px;
   }
   .track {
@@ -110,54 +198,55 @@
   .fill {
     background: var(--accent);
   }
-  .locked {
+  .readers {
     position: absolute;
-    right: -4px;
-    top: 38px;
-    height: 32px;
     display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: center;
-    border: 1px dashed var(--border-strong);
-    border-radius: 6px;
-    background: #1b1c21;
-    font-size: 11px;
-    color: var(--muted);
-    overflow: hidden;
-  }
-  .point,
-  .here {
-    position: absolute;
-    top: 54px;
-    transform: translate(-50%, -50%);
-    border-radius: 50%;
+    gap: 2px;
+    padding: 2px 0;
     border: 0;
-    padding: 0;
-    font-size: 12px;
-    font-weight: 700;
-    color: var(--accent-ink);
+    border-radius: 8px;
+    background: none;
+    color: var(--muted);
+    font: inherit;
   }
-  .point {
-    background: var(--accent);
+  .faces {
+    display: flex;
   }
-  .here {
-    width: 30px;
-    height: 30px;
-    font-size: 10px;
+  .faces > :global(* + *) {
+    margin-left: -10px;
+  }
+  .dot-me {
+    width: 14px;
+    height: 14px;
+    margin: 5px;
+    border-radius: 50%;
     background: var(--me);
-    z-index: 1;
   }
-  .selected {
+  .names {
+    max-width: 100%;
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .here .names {
+    color: var(--me);
+    font-weight: 700;
+  }
+  .label.selected {
     background: #fff;
-    box-shadow: 0 0 0 4px rgba(232, 163, 61, 0.5);
+    box-shadow: 0 0 0 3px rgba(232, 163, 61, 0.5);
   }
   .here.selected {
-    box-shadow: 0 0 0 4px rgba(106, 169, 255, 0.5);
+    background: rgba(106, 169, 255, 0.15);
+    box-shadow: 0 0 0 2px rgba(106, 169, 255, 0.5);
   }
   .new {
     position: absolute;
-    top: -2px;
-    right: -2px;
+    top: -3px;
+    right: -3px;
     width: 10px;
     height: 10px;
     border-radius: 50%;
