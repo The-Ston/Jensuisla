@@ -117,9 +117,34 @@ describe('RichInput', () => {
     expect(el.querySelector('.page-chip')?.textContent).toBe('p. 120');
   });
 
-  it('leaves chapter readings alone', () => {
-    const { el, props } = setup(makeScale('chapter', 22, null));
-    type(el, 'p.5 ');
-    expect(props.value).toBe('p.5 ');
+  it('tags chapters, not pages, in chapter readings', () => {
+    for (const [typed, expected] of [
+      ['ch.5 ', '[[p:5]] '],
+      ['chap 5,', '[[p:5]],'],
+      ['chapitre 12 ', '[[p:12]] '],
+      ['p.5 ', 'p.5 '],
+      ['ch.30 ', 'ch.30 '], // beyond the book
+    ]) {
+      const { el, props } = setup(makeScale('chapter', 22, null));
+      type(el, typed);
+      expect(props.value).toBe(expected);
+      unmount(component!);
+      component = null;
+    }
+    const { el } = setup(makeScale('chapter', 22, null));
+    type(el, 'ch5 ');
+    expect(el.querySelector('.page-chip')?.textContent).toBe('ch. 5');
+  });
+
+  it('leaves chapters alone in page readings', () => {
+    const { el, props } = setup(reference);
+    type(el, 'ch.5 ');
+    expect(props.value).toBe('ch.5 ');
+  });
+
+  it('leaves percent readings alone', () => {
+    const { el, props } = setup(makeScale('percent', 100, null));
+    type(el, 'p.5 ch.5 ');
+    expect(props.value).toBe('p.5 ch.5 ');
   });
 });

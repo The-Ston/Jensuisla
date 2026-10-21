@@ -1,12 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { pageToken, splitPageRefs } from '$shared/domain/page-refs';
+  import { mentionLabel, pageToken, splitPageRefs } from '$shared/domain/page-refs';
   import { displayTotal, fromDisplay, toDisplay, type Scale } from '../lib/scale';
 
   /**
-   * Text input where page mentions ("p.25", "page 25") turn into tags as you type, like options
-   * of a Discord bot command. Backspace right after a tag turns it back into the text typed. The value is plain text in
-   * which tags are stored as tokens holding the reference-edition page.
+   * Text input where page or chapter mentions ("p.25", "ch.3"), in the reading's unit only, turn
+   * into tags as you type, like options of a Discord bot command. Backspace right after a tag
+   * turns it back into the text typed. The value is plain text in which tags are stored as
+   * tokens holding the position (reference-edition page, or chapter).
    */
   let {
     value = $bindable(),
@@ -29,9 +30,15 @@
   // Last value produced by this editor: lets us tell our own updates from external ones.
   let lastValue: string | null = null;
 
-  // "p.25", "p 25", "p25", "page 25", "pages 25", once followed by a space or punctuation.
-  const MENTION = /(?<=^|[\s(«"'’])(?:p\.?|pages?)\s?(\d{1,5})(?=[\s.,;:!?)»"'’])/gi;
-  const pagesEnabled = $derived(scale.unit === 'page');
+  // "p.25", "p 25", "p25", "page 25", "pages 25", or "ch.3", "chap 3", "chapitre 3".
+  const WORDS: Partial<Record<Scale['unit'], string>> = { page: 'p\\.?|pages?', chapter: 'ch(?:ap)?\\.?|chapitres?' };
+  const mention = (end: string, flags: string) =>
+    new RegExp(`(?<=^|[\\s(«"'’])(?:${WORDS[scale.unit]})\\s?(\\d{1,5})${end}`, flags);
+  // Once followed by a space or punctuation.
+  const MENTION = $derived(mention(`(?=[\\s.,;:!?)»"'’])`, 'gi'));
+  // Same, ending the text: only used when sending, as the mention can't be "finished" by typing.
+  const MENTION_AT_END = $derived(mention('$', 'i'));
+  const mentionsEnabled = $derived(scale.unit in WORDS);
 
   export function focus() {
     el?.focus();
@@ -43,7 +50,7 @@
     span.className = 'page-chip';
     span.contentEditable = 'false';
     span.dataset.position = String(position);
-    span.textContent = `p. ${shown}`;
+    span.textContent = mentionLabel(scale.unit, shown);
     return span;
   }
 
@@ -95,12 +102,10 @@
     sel?.addRange(range);
   }
 
-  // Same, ending the text: only used when sending, as the mention can't be "finished" by typing.
-  const MENTION_AT_END = /(?<=^|[\s(«"'’])(?:p\.?|pages?)\s?(\d{1,5})$/i;
 
   /** Converts a mention left at the very end, then returns the final value. */
   export function finalize(): string {
-    if (el && pagesEnabled) {
+    if (el && mentionsEnabled) {
       const last = lastTextNode();
       const m = last && MENTION_AT_END.exec(last.data);
       if (last && m && inBook(m)) replaceWithTag(last, m);
@@ -156,7 +161,7 @@
    * into text stays text.
    */
   function convertBeforeCaret() {
-    if (!el || !pagesEnabled) return;
+    if (!el || !mentionsEnabled) return;
     const at = caret();
     if (!at) return;
     const from = pasteFrom ? (pasteFrom.node === at.node ? pasteFrom.offset : 0) : at.offset - 1;

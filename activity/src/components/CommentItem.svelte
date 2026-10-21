@@ -66,8 +66,9 @@
   let confirming = $state(false);
   let textarea: { focus: () => void; finalize: () => string } | undefined = $state();
 
-  /** "p. 25" in the reader's edition ("p. ≈ 34" when converted). */
-  const pageLabel = (position: number) => scaleLabel(scale, position).replace(/^Page /, 'p. ');
+  /** "p. 25" in the reader's edition ("p. ≈ 34" when converted), or "ch. 3". */
+  const pageLabel = (position: number) =>
+    scaleLabel(scale, position).replace(/^Page /, 'p. ').replace(/^Chapitre /, 'ch. ');
 
   const author = $derived(members[comment.authorId]);
   const mine = $derived(comment.authorId === meId);

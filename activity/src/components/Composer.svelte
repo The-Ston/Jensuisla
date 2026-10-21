@@ -172,7 +172,11 @@
     <RichInput
       id="comment-text"
       label="Commentaire"
-      placeholder={scale.unit === 'page' ? 'Écrire un commentaire… (p.25 devient une page cliquable)' : 'Écrire un commentaire…'}
+      placeholder={scale.unit === 'page'
+        ? 'Écrire un commentaire… (p.25 devient une page cliquable)'
+        : scale.unit === 'chapter'
+          ? 'Écrire un commentaire… (ch.3 devient un chapitre cliquable)'
+          : 'Écrire un commentaire…'}
       {scale}
       bind:value={text}
       bind:this={input}

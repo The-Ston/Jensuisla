@@ -90,7 +90,8 @@ describe('page mentions', () => {
 
   it('only keeps valid tokens', () => {
     expect(sanitizePageRefs('[[p:25]] [[p:999]]', 'page', 352)).toBe('[[p:25]] p. 999');
-    expect(sanitizePageRefs('[[p:3]]', 'chapter', 22)).toBe('p. 3');
+    expect(sanitizePageRefs('[[p:3]] [[p:30]]', 'chapter', 22)).toBe('[[p:3]] ch. 30');
+    expect(sanitizePageRefs('[[p:3]]', 'percent', 100)).toBe('p. 3');
   });
 });
 

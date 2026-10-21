@@ -1,5 +1,5 @@
 import { canSee } from '../domain/access';
-import { renderPageRefs } from '../domain/page-refs';
+import { mentionLabel, renderPageRefs } from '../domain/page-refs';
 import { fromReference } from '../domain/progress';
 import type { NotifyPref, ProgressUnit } from '../domain/types';
 import type { DataStore } from '../store/data-store';
@@ -88,7 +88,7 @@ export function buildNotifications(
       if (pref === 'dm') {
         const approx = !!p.editionTotal && p.editionTotal !== total;
         // Page mentions in excerpts are shown in the recipient's edition.
-        const pages = (pos: number) => `p. ${approx ? '≈ ' : ''}${fromReference(pos, p.editionTotal, total)}`;
+        const pages = (pos: number) => mentionLabel(unit, fromReference(pos, p.editionTotal, total), approx);
         const lines = relevant.map((e) =>
           describe(
             { ...e, excerpt: renderPageRefs(e.excerpt, pages) },
