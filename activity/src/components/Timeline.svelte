@@ -27,6 +27,9 @@
   const LABEL_ROW = 30;
   const READER_ROW = 46;
   const GAP = 6;
+  const LABEL_ROWS = 3;
+  const READER_ROWS = 2;
+  const MAX_WIDTH = 2400;
 
   let width = $state(0);
 
@@ -40,37 +43,52 @@
   }
 
   /**
-   * Places boxes centered on their anchor, kept inside the line's width, each in the first row
-   * where it fits (or the row that frees up first).
+   * Smallest line width at which boxes (sorted by position) fit in `rows` rows: each box must
+   * clear the one `rows` places before it, which would otherwise share its row.
    */
-  function stack<T extends { anchor: number; size: number }>(items: T[], maxRows: number) {
+  function neededWidth(items: { position: number; size: number }[], rows: number): number {
+    let needed = 0;
+    for (let i = 0; i + rows < items.length; i++) {
+      const a = items[i];
+      const b = items[i + rows];
+      const span = total > 0 ? (b.position - a.position) / total : 0;
+      if (span > 0) needed = Math.max(needed, ((a.size + b.size) / 2 + GAP) / span);
+    }
+    return needed;
+  }
+
+  /**
+   * Places boxes centered on their position, kept inside the line's width, each in the first row
+   * where it fits. Past `rows` rows (when the line can't grow wider), a new row is added rather
+   * than letting boxes overlap.
+   */
+  function stack<T extends { position: number; size: number }>(items: T[]) {
     const rowEnds: number[] = [];
     return items.map((item) => {
-      const left = Math.max(0, Math.min(item.anchor - item.size / 2, width - item.size));
+      const anchor = x(item.position);
+      const left = Math.max(0, Math.min(anchor - item.size / 2, width - item.size));
       let row = rowEnds.findIndex((end) => end + GAP <= left);
-      if (row === -1) row = rowEnds.length < maxRows ? rowEnds.length : rowEnds.indexOf(Math.min(...rowEnds));
+      if (row === -1) row = rowEnds.length;
       rowEnds[row] = left + item.size;
-      return { ...item, left, row };
+      return { ...item, anchor, left, row };
     });
   }
 
-  const labels = $derived(
-    stack(
-      points.map((p) => {
-        const text = `${short(p.start)} · ${p.count}`;
-        return { point: p, text, anchor: x(p.start), size: text.length * 7 + 20 };
-      }),
-      3,
-    ),
+  const labelItems = $derived(
+    points.map((p) => {
+      const text = `${short(p.start)} · ${p.count}`;
+      return { point: p, text, position: p.start, size: text.length * 7 + 20 };
+    }),
   );
+  const labels = $derived(stack(labelItems));
   const labelRows = $derived(Math.max(1, ...labels.map((l) => l.row + 1)));
 
   // Readers at the same position share one marker; mine comes first and selects "here".
-  const groups = $derived.by(() => {
+  const groupItems = $derived.by(() => {
     const byProgress = new Map<number, typeof readers>();
     for (const r of readers) byProgress.set(r.progress, [...(byProgress.get(r.progress) ?? []), r]);
     if (!byProgress.has(myProgress)) byProgress.set(myProgress, []);
-    const list = [...byProgress.entries()]
+    return [...byProgress.entries()]
       .sort(([a], [b]) => a - b)
       .map(([progress, rs]) => {
         const sorted = [...rs].sort((a, b) => Number(b.isMe) - Number(a.isMe));
@@ -78,14 +96,18 @@
         const names = sorted.map((r) => (r.isMe ? 'Toi' : r.member.name));
         const text = names.length > 2 ? `${names[0]} +${names.length - 1}` : names.join(' · ') || 'Toi';
         const avatars = sorted.slice(0, 3);
-        return { progress, readers: sorted, avatars, isHere, text, anchor: x(progress), size: Math.max(24 + (avatars.length - 1) * 14, Math.min(text.length * 6.5, 120)) + 8 };
+        return { progress, readers: sorted, avatars, isHere, text, position: progress, size: Math.max(24 + (avatars.length - 1) * 14, Math.min(text.length * 6.5, 120)) + 8 };
       });
-    return stack(list, 2);
   });
+  const groups = $derived(stack(groupItems));
   const readerRows = $derived(Math.max(1, ...groups.map((g) => g.row + 1)));
 
   // Chapter readings get one graduation per chapter, numbered under the line when there's room.
   const chapters = $derived(scale.unit === 'chapter' ? scale.total : 0);
+  // Wide enough for crowded spots to fit their rows; the scroller handles the overflow.
+  const minWidth = $derived(
+    Math.max(320, Math.min(Math.max(neededWidth(labelItems, LABEL_ROWS), neededWidth(groupItems, READER_ROWS), chapters * 14), MAX_WIDTH)),
+  );
   const numberEvery = $derived(chapters && width ? Math.ceil(20 / (width / chapters)) : 1);
   const tickSpace = $derived(chapters ? 16 : 0);
 
@@ -98,7 +120,7 @@
   <div
     class="timeline"
     bind:clientWidth={width}
-    style:min-width="{Math.max(320, Math.min(Math.max(points.length * 60, chapters * 14), 1600))}px"
+    style:min-width="{minWidth}px"
     style:height="{readersTop + readerRows * READER_ROW}px"
   >
     {#each labels as l (l.point.start)}
