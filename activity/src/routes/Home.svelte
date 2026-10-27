@@ -93,11 +93,19 @@
       <div class="grid">
         {#each mine as reading (reading.id)}
           <button class="book card" onclick={() => onOpen(reading.id)}>
-            {#if reading.coverUrl}
-              <img src={reading.coverUrl} alt="" class="cover" />
-            {:else}
-              <span class="cover placeholder" aria-hidden="true">{reading.title.slice(0, 1)}</span>
-            {/if}
+            <span class="cover-wrap">
+              {#if reading.coverUrl}
+                <img src={reading.coverUrl} alt="" class="cover" />
+              {:else}
+                <span class="cover placeholder" aria-hidden="true">{reading.title.slice(0, 1)}</span>
+              {/if}
+              {#if reading.unread > 0}
+                <span class="unread">
+                  {reading.unread > 99 ? '99+' : reading.unread}
+                  <span class="sr-only">nouveau{reading.unread > 1 ? 'x' : ''} message{reading.unread > 1 ? 's' : ''}</span>
+                </span>
+              {/if}
+            </span>
             <span class="info">
               <strong>{reading.title}</strong>
               {#if reading.author}<span class="muted">{reading.author}</span>{/if}
@@ -219,6 +227,28 @@
     object-fit: cover;
     flex-shrink: 0;
     background: var(--surface-2);
+  }
+  .cover-wrap {
+    position: relative;
+    flex-shrink: 0;
+    display: flex;
+  }
+  .unread {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 11px;
+    border: 2px solid var(--surface);
+    background: var(--ok);
+    color: var(--bg);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
   }
   .placeholder {
     display: flex;

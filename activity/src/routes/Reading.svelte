@@ -108,6 +108,14 @@
     if (toast) clearTimeout(toast.timer);
   });
 
+  // Everything shown until now counts as read on the home page, so the visit is saved before it loads.
+  let leaving = $state(false);
+  async function back() {
+    leaving = true;
+    if (view?.me) await api.visited(id).catch(() => undefined);
+    onBack();
+  }
+
   function select(key: number | 'here' | 'all') {
     selected = key;
     if (typeof key === 'number') seen = new Set([...seen, key]);
@@ -198,7 +206,7 @@
 <main>
   {#if view && reading}
     <header>
-      <button class="btn ghost small" onclick={onBack}>‹ Mes lectures</button>
+      <button class="btn ghost small" disabled={leaving} onclick={back}>‹ Mes lectures</button>
       <div class="book">
         {#if reading.coverUrl}
           <img src={reading.coverUrl} alt="" class="cover" />
@@ -340,7 +348,7 @@
     {/if}
   {:else if error}
     <p class="error">{error}</p>
-    <button class="btn" onclick={onBack}>Retour</button>
+    <button class="btn" disabled={leaving} onclick={back}>Retour</button>
   {:else}
     <p class="muted">Chargement…</p>
   {/if}

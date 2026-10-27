@@ -124,6 +124,11 @@ export class Service {
   private summary(entry: ReadingEntry, userId: string): ReadingSummary {
     const r = entry.reading;
     const me = entry.participants.get(userId)?.value;
+    // Comments by others the reader can see and that were written since their last visit.
+    const since = me?.lastVisit?.at ?? 0;
+    const unread = me
+      ? [...entry.comments.values()].filter((c) => c.authorId !== userId && c.position <= me.progress && c.createdAt > since).length
+      : 0;
     return {
       id: r.id,
       title: r.title,
@@ -140,6 +145,7 @@ export class Service {
       myProgress: me?.progress ?? null,
       myShownProgress: me ? (me.editionProgress ?? fromReference(me.progress, me.editionTotal, r.total)) : null,
       myShownTotal: (r.unit === 'page' && me?.editionTotal) || r.total,
+      unread,
     };
   }
 

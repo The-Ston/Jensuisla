@@ -147,6 +147,23 @@ describe('Service', () => {
     await expect(ctx.service.toggleFavoriteGif(BRUNO, '../x')).rejects.toThrow(HttpError);
   });
 
+  it('counts unread comments on the home page: visible, by others, since the last visit', async () => {
+    const book = await createBook(ctx.service);
+    await ctx.service.setProgress(ALICE, book.id, 13, null);
+    await ctx.service.setProgress(BRUNO, book.id, 5, null);
+    await ctx.service.addComment(ALICE, book.id, { position: 2, text: 'avant', gif: null });
+    await ctx.service.markVisited(BRUNO, book.id);
+    await ctx.service.addComment(ALICE, book.id, { position: 3, text: 'lisible', gif: null });
+    await ctx.service.addComment(ALICE, book.id, { position: 12, text: 'trop loin', gif: null });
+    await ctx.service.addComment(BRUNO, book.id, { position: 4, text: 'le mien', gif: null });
+
+    const unread = async (userId: string) => (await ctx.service.home(userId)).readings.find((r) => r.id === book.id)?.unread;
+    expect(await unread(BRUNO)).toBe(1);
+    expect(await unread(CHLOE)).toBe(0); // not a participant
+    await ctx.service.markVisited(BRUNO, book.id);
+    expect(await unread(BRUNO)).toBe(0);
+  });
+
   it('keeps each reader’s appearance, defaulting to the night theme', async () => {
     expect((await ctx.service.home(BRUNO)).me.appearance).toEqual({ theme: 'night', accent: null });
     await ctx.service.setNotify(BRUNO, 'none');

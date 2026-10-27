@@ -26,6 +26,8 @@ export interface ReadingSummary {
   /** The reader's progress and total in their own edition (page unit), for display. */
   myShownProgress: number | null;
   myShownTotal: number;
+  /** Comments by others, visible to the caller, written since their last visit. */
+  unread: number;
 }
 
 export interface HomeView {
