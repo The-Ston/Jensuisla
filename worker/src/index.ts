@@ -138,6 +138,8 @@ function toOp(method: string, parts: string[], data: Record<string, any>): Op | 
         return { op: 'undo', readingId: id };
       case 'visited':
         return { op: 'visited', readingId: id };
+      case 'spoilers':
+        return { op: 'spoilers', readingId: id, on: data.on === true };
       case 'comments':
         return {
           op: 'comment',

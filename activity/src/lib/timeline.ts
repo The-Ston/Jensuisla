@@ -21,12 +21,18 @@ export function buildPoints(
 ): TimelinePoint[] {
   const byId = new Map(view.comments.map((c) => [c.id, c]));
   const window = pointWindow(view.reading.unit, view.reading.total);
+  const progress = view.me?.progress ?? 0;
   return groupIntoPoints(view.comments, window).map((p) => {
     const comments = p.ids.map((id) => byId.get(id)!).sort((a, b) => a.position - b.position || a.createdAt - b.createdAt);
     const isNew =
       !!lastVisit &&
       !seen.has(p.start) &&
-      comments.some((c) => c.authorId !== meId && (c.createdAt > lastVisit.at || c.position > lastVisit.progress));
+      comments.some(
+        (c) =>
+          c.authorId !== meId &&
+          // Spoilers aren't "unlocked" by moving forward: only those written since count as new.
+          (c.createdAt > lastVisit.at || (c.position > lastVisit.progress && c.position <= progress)),
+      );
     return { start: p.start, end: p.end, count: comments.length, isNew, comments };
   });
 }

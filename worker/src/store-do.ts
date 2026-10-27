@@ -26,6 +26,7 @@ export type Op =
   | { op: 'progress'; readingId: string; value: number; editionTotal: number | null }
   | { op: 'undo'; readingId: string }
   | { op: 'visited'; readingId: string }
+  | { op: 'spoilers'; readingId: string; on: boolean }
   | {
       op: 'comment';
       readingId: string;
@@ -184,6 +185,9 @@ export class JensuislaStore extends DurableObject<Env> {
       case 'visited':
         await s.markVisited(userId, op.readingId);
         return null;
+      case 'spoilers':
+        await s.setSpoilers(userId, op.readingId, op.on);
+        break;
       case 'comment':
         await s.addComment(userId, op.readingId, op);
         break;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canSee, canWriteAt, visibleComments } from '../src/domain/access';
+import { canSee, canWriteAt, reach, visibleComments } from '../src/domain/access';
 import { groupIntoPoints, pointWindow } from '../src/domain/points';
 import { applyProgress, fromReference, newParticipant, toReference, undoProgress } from '../src/domain/progress';
 import { decode, encode, RecordTooLargeError } from '../src/store/codec';
@@ -32,6 +32,12 @@ describe('anti-spoiler', () => {
     expect(canWriteAt(reading, 6, 5)).toBe(false);
     expect(canWriteAt(reading, 2.5, 5)).toBe(false);
     expect(canWriteAt(reading, 23, 30)).toBe(false);
+  });
+
+  it('extends the reach to the whole book with spoilers', () => {
+    expect(reach({ progress: 5 }, 22)).toBe(5);
+    expect(reach({ progress: 5, spoilers: true }, 22)).toBe(22);
+    expect(canWriteAt({ total: 22 }, 20, reach({ progress: 5, spoilers: true }, 22))).toBe(true);
   });
 });
 

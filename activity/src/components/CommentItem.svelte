@@ -24,6 +24,7 @@
     canModerate,
     original,
     highlighted = false,
+    spoiler = false,
     myProgress,
     onJump,
     onJumpToPosition,
@@ -42,7 +43,9 @@
     /** The comment this one replies to: undefined if not a reply, null if it was deleted. */
     original: Comment | null | undefined;
     highlighted?: boolean;
-    /** The reader's progress: page mentions beyond it are not clickable. */
+    /** Anchored past the reader's progress, shown because they chose to see spoilers. */
+    spoiler?: boolean;
+    /** How far the reader can see: page mentions beyond it are not clickable. */
     myProgress: number;
     onJump: (commentId: string) => void;
     onJumpToPosition: (position: number) => void;
@@ -145,7 +148,7 @@
   }
 </script>
 
-<article id="comment-{comment.id}" class:editing class:highlighted class:reply={original !== undefined}>
+<article id="comment-{comment.id}" class:editing class:highlighted class:spoiler class:reply={original !== undefined}>
   {#if original !== undefined}
     <div class="quote">
       <span class="elbow" aria-hidden="true"></span>
@@ -165,6 +168,7 @@
     <div class="meta">
       <strong>{author?.name ?? 'Ancien membre'}</strong>
       <span class="muted">{scaleLabel(scale, comment.position)} · {timeAgo(comment.createdAt)}{comment.editedAt ? ' · modifié' : ''}</span>
+      {#if spoiler}<span class="spoiler-tag">Spoiler</span>{/if}
     </div>
 
     {#if editing}
@@ -308,6 +312,22 @@
   article.reply {
     flex-wrap: wrap;
     row-gap: 2px;
+  }
+  article.spoiler {
+    border-left: 2px dashed var(--danger);
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+  }
+  .spoiler-tag {
+    align-self: center;
+    padding: 0 6px;
+    border: 1px solid var(--danger);
+    border-radius: 6px;
+    color: var(--danger);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
   }
   article.highlighted {
     animation: flash 1.6s ease-out;

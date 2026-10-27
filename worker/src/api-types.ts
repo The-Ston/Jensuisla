@@ -48,6 +48,8 @@ export interface MyProgressView {
   shownProgress: number;
   canUndo: boolean;
   lastVisit: { at: number; progress: number } | null;
+  /** Comments past the progress are shown too, and can be written. */
+  spoilers: boolean;
 }
 
 export interface ReadingView {

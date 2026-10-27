@@ -7,7 +7,7 @@ import type {
   ReadingView,
 } from '../api-types';
 import type { FileUpload } from '../discord/api';
-import { canSee, canWriteAt, visibleComments } from '../domain/access';
+import { canSee, canWriteAt, reach, visibleComments } from '../domain/access';
 import {
   MAX_AUTHOR_LENGTH,
   MAX_COMMENT_LENGTH,
@@ -221,7 +221,7 @@ export class Service {
     if (!me && entry.reading.joinMode === 'invite') throw new HttpError(403, 'Lecture sur invitation');
 
     // Non-participants only see the summary and who is reading, never comments.
-    const comments = me ? visibleComments(entry.comments.values(), me.progress) : [];
+    const comments = me ? visibleComments(entry.comments.values(), reach(me, entry.reading.total)) : [];
     const memberIds = new Set<string>([...entry.participants.keys(), entry.reading.organizerId]);
     for (const c of comments) {
       memberIds.add(c.authorId);
@@ -248,6 +248,7 @@ export class Service {
         shownProgress: me.editionProgress ?? fromReference(me.progress, me.editionTotal, entry.reading.total),
         canUndo: me.history.length > 0,
         lastVisit: me.lastVisit,
+        spoilers: !!me.spoilers,
       },
       comments,
       members,
@@ -298,6 +299,12 @@ export class Service {
     await this.store.saveParticipant(readingId, { ...previous, editionProgress: null });
   }
 
+  async setSpoilers(userId: string, readingId: string, spoilers: boolean): Promise<void> {
+    const entry = this.entry(readingId);
+    const p = this.participant(entry, userId);
+    await this.store.saveParticipant(readingId, { ...p, spoilers });
+  }
+
   async markVisited(userId: string, readingId: string): Promise<void> {
     const entry = this.entry(readingId);
     const p = this.participant(entry, userId);
@@ -311,7 +318,7 @@ export class Service {
   ): Promise<Comment> {
     const entry = this.entry(readingId);
     const me = this.participant(entry, userId);
-    if (!canWriteAt(entry.reading, input.position, me.progress))
+    if (!canWriteAt(entry.reading, input.position, reach(me, entry.reading.total)))
       throw new HttpError(400, 'Tu ne peux commenter que ce que tu as déjà lu');
     const text = sanitizePageRefs((input.text ?? '').trim(), entry.reading.unit, entry.reading.total);
     const gif = this.validGif(input.gif);
@@ -365,7 +372,8 @@ export class Service {
   private visibleComment(entry: ReadingEntry, userId: string, commentId: string) {
     const me = this.participant(entry, userId);
     const comment = entry.comments.get(commentId);
-    if (!comment || !canSee(comment.position, me.progress)) throw new HttpError(404, 'Commentaire introuvable');
+    if (!comment || !canSee(comment.position, reach(me, entry.reading.total)))
+      throw new HttpError(404, 'Commentaire introuvable');
     return comment;
   }
 

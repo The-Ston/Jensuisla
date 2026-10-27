@@ -147,6 +147,31 @@ describe('Service', () => {
     await expect(ctx.service.toggleFavoriteGif(BRUNO, '../x')).rejects.toThrow(HttpError);
   });
 
+  it('lets a reader opt into spoilers for one reading: see and write ahead, nothing leaks elsewhere', async () => {
+    const book = await createBook(ctx.service);
+    await ctx.service.setProgress(ALICE, book.id, 13, null);
+    await ctx.service.setProgress(BRUNO, book.id, 5, null);
+    await ctx.service.addComment(ALICE, book.id, { position: 12, text: 'plus loin', gif: null });
+    await expect(ctx.service.addComment(BRUNO, book.id, { position: 9, text: 'en avance', gif: null })).rejects.toThrow(HttpError);
+
+    await ctx.service.setSpoilers(BRUNO, book.id, true);
+    const view = await ctx.service.readingView(BRUNO, book.id);
+    expect(view.me?.spoilers).toBe(true);
+    expect(view.comments.map((c) => c.text)).toEqual(['plus loin']);
+    const ahead = await ctx.service.addComment(BRUNO, book.id, { position: 9, text: 'en avance', gif: null });
+    await ctx.service.toggleReaction(BRUNO, book.id, ahead.id, '👍');
+    expect((await ctx.service.home(BRUNO)).readings[0]!.unread).toBe(0); // the badge ignores spoilers
+
+    // Others only see it once they reach it, as usual.
+    expect((await ctx.service.readingView(ALICE, book.id)).comments.map((c) => c.text)).toEqual(['en avance', 'plus loin']);
+
+    // Progress changes keep the choice; turning it off hides everything past the progress again.
+    await ctx.service.setProgress(BRUNO, book.id, 6, null);
+    expect((await ctx.service.readingView(BRUNO, book.id)).me?.spoilers).toBe(true);
+    await ctx.service.setSpoilers(BRUNO, book.id, false);
+    expect((await ctx.service.readingView(BRUNO, book.id)).comments).toEqual([]);
+  });
+
   it('counts unread comments on the home page: visible, by others, since the last visit', async () => {
     const book = await createBook(ctx.service);
     await ctx.service.setProgress(ALICE, book.id, 13, null);

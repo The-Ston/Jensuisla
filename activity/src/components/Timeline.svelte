@@ -13,6 +13,7 @@
     points,
     readers,
     myProgress,
+    spoilers = false,
     selected,
     onSelect,
   }: {
@@ -20,6 +21,8 @@
     points: TimelinePoint[];
     readers: { member: MemberView; progress: number; isMe: boolean }[];
     myProgress: number;
+    /** The reader chose to see past their progress: that part of the line is marked. */
+    spoilers?: boolean;
     selected: number | 'here' | 'all';
     onSelect: (key: number | 'here') => void;
   } = $props();
@@ -125,14 +128,16 @@
   >
     {#each labels as l (l.point.start)}
       {@const top = l.row * LABEL_ROW}
-      <span class="stem" style:left="{l.anchor}px" style:top="{top + 22}px" style:height="{lineTop - top - 22}px"></span>
+      {@const spoiler = l.point.start > myProgress}
+      <span class="stem" class:spoiler style:left="{l.anchor}px" style:top="{top + 22}px" style:height="{lineTop - top - 22}px"></span>
       <button
         class="label"
+        class:spoiler
         class:selected={selected === l.point.start}
         style:left="{l.left}px"
         style:top="{top}px"
         style:width="{l.size}px"
-        aria-label="{label(l.point)}, {l.point.count} message{l.point.count > 1 ? 's' : ''}{l.point.isNew ? ', nouveau' : ''}"
+        aria-label="{label(l.point)}, {l.point.count} message{l.point.count > 1 ? 's' : ''}{spoiler ? ', spoiler' : ''}{l.point.isNew ? ', nouveau' : ''}"
         aria-pressed={selected === l.point.start}
         title={label(l.point)}
         onclick={() => onSelect(l.point.start)}
@@ -143,6 +148,9 @@
     {/each}
 
     <div class="track" style:top="{lineTop}px"></div>
+    {#if spoilers}
+      <div class="spoiler-zone" style:top="{lineTop}px" style:left="{x(myProgress)}px"></div>
+    {/if}
     <div class="fill" style:top="{lineTop}px" style:width="{x(myProgress)}px"></div>
 
     {#each { length: chapters + 1 }, i (i)}
@@ -293,7 +301,29 @@
     color: var(--me);
     font-weight: 700;
   }
+  .label.spoiler {
+    background: var(--surface);
+    color: var(--danger);
+    border: 1.5px dashed var(--danger);
+  }
+  .stem.spoiler {
+    background: var(--danger);
+    opacity: 0.55;
+  }
+  .spoiler-zone {
+    position: absolute;
+    right: 0;
+    height: 10px;
+    margin-top: -5px;
+    border-radius: 3px;
+    background: repeating-linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--danger) 35%, transparent) 0 4px,
+      transparent 4px 8px
+    );
+  }
   .label.selected {
+    border-color: transparent;
     background: var(--text);
     color: var(--bg);
     box-shadow: 0 0 0 3px var(--accent-ring);

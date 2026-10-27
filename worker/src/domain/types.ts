@@ -43,6 +43,8 @@ export interface Participant {
   /** Previous progress values, most recent last, used by "undo". */
   history: number[];
   lastVisit: { at: number; progress: number } | null;
+  /** Shows (and allows writing) past the reader's progress. Optional for older records. */
+  spoilers?: boolean;
 }
 
 export interface Gif {

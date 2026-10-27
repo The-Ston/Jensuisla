@@ -30,6 +30,11 @@
 
   const reading = $derived(view?.reading);
   const myProgress = $derived(view?.me?.progress ?? 0);
+  const spoilers = $derived(!!view?.me?.spoilers);
+  // How far the reader can read and write: the whole book once they chose to see spoilers.
+  const reach = $derived(spoilers ? (view?.reading.total ?? 0) : myProgress);
+  let settingsOpen = $state(false);
+  let settingsEl: HTMLElement | undefined = $state();
   // Everything is shown in the reader's own edition when they have one (page unit).
   const scale = $derived(
     makeScale(
@@ -149,6 +154,18 @@
     }
   }
 
+  async function toggleSpoilers() {
+    try {
+      await mutate(() => api.spoilers(id, !spoilers));
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Enregistrement impossible';
+    }
+  }
+
+  function closeSettingsOutside(event: MouseEvent) {
+    if (settingsOpen && settingsEl && !settingsEl.contains(event.target as Node)) settingsOpen = false;
+  }
+
   async function openInvite() {
     inviting = !inviting;
     if (inviting && members.length === 0) members = await api.members().catch(() => []);
@@ -176,7 +193,7 @@
 
   /** Follows a page mention: selects the timeline point closest to that page. */
   async function jumpToPosition(position: number) {
-    if (position > myProgress) return;
+    if (position > reach) return;
     const containing = points.find((p) => p.start <= position && position <= p.end);
     const closest =
       containing ??
@@ -203,6 +220,11 @@
   }
 </script>
 
+<svelte:window
+  onclick={closeSettingsOutside}
+  onkeydown={(e) => e.key === 'Escape' && (settingsOpen = false)}
+/>
+
 <main>
   {#if view && reading}
     <header>
@@ -219,9 +241,42 @@
           </p>
         </div>
       </div>
-      {#if reading.canInvite}
-        <button class="btn small" aria-expanded={inviting} onclick={openInvite}>Inviter</button>
-      {/if}
+      <div class="actions">
+        {#if reading.canInvite}
+          <button class="btn small" aria-expanded={inviting} onclick={openInvite}>Inviter</button>
+        {/if}
+        {#if view.me}
+          <div class="settings" bind:this={settingsEl}>
+            <button
+              class="btn small gear"
+              aria-label="Réglages de cette lecture"
+              aria-expanded={settingsOpen}
+              aria-controls="reading-settings"
+              onclick={() => (settingsOpen = !settingsOpen)}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+            </button>
+            {#if settingsOpen}
+              <div class="menu" id="reading-settings">
+                <h3>Réglages de cette lecture</h3>
+                <label class="setting">
+                  <span class="setting-text">
+                    <strong>Voir les spoilers</strong>
+                    <span class="muted small">Affiche aussi les messages après ta position ({scaleLabel(scale, myProgress).toLowerCase()}) et permet d’y écrire.</span>
+                  </span>
+                  <span class="switch">
+                    <input type="checkbox" role="switch" checked={spoilers} onchange={toggleSpoilers} />
+                    <span class="knob" aria-hidden="true"></span>
+                  </span>
+                </label>
+              </div>
+            {/if}
+          </div>
+        {/if}
+      </div>
     </header>
 
     {#if error}<p class="error">{error}</p>{/if}
@@ -259,13 +314,18 @@
     <section class="card timeline-card" aria-label="Frise">
       <div class="timeline-head">
         <h2>Frise</h2>
-        <span class="muted small">Clique sur un point pour voir ses messages</span>
+        {#if spoilers}
+          <span class="spoilers-on">Spoilers visibles</span>
+        {:else}
+          <span class="muted small">Clique sur un point pour voir ses messages</span>
+        {/if}
       </div>
       <Timeline
         {scale}
         {points}
         {readers}
         {myProgress}
+        {spoilers}
         {selected}
         onSelect={select}
       />
@@ -294,7 +354,12 @@
 
         <div class="comments">
           {#each shownComments as comment, i (comment.id)}
-            {#if i > 0 && comment.position !== shownComments[i - 1]!.position}
+            {@const previous = shownComments[i - 1]}
+            {#if comment.position > myProgress && (!previous || previous.position <= myProgress)}
+              <div class="separator spoiler" role="separator">
+                <span>Après ta position · {scaleLabel(scale, myProgress)}</span>
+              </div>
+            {:else if previous && comment.position !== previous.position}
               <div class="separator" role="separator">
                 <span>{scaleLabel(scale, comment.position)}</span>
               </div>
@@ -308,8 +373,9 @@
               onReact={(emoji) => mutate(() => api.react(id, comment.id, emoji))}
               original={originalOf(comment)}
               highlighted={highlightedId === comment.id}
+              spoiler={comment.position > myProgress}
               onJump={jumpTo}
-              {myProgress}
+              myProgress={reach}
               onJumpToPosition={jumpToPosition}
               onReply={() => replyTo(comment)}
               readingId={id}
@@ -322,7 +388,7 @@
               {selected === 'all' ? 'Aucun message visible pour l’instant.' : 'Personne n’a encore écrit ici. Lance la discussion !'}
             </p>
           {/each}
-          {#if selected === 'all' && myProgress < reading.total}
+          {#if selected === 'all' && !spoilers && myProgress < reading.total}
             <p class="muted small locked-note">Les messages après {scaleLabel(scale, myProgress).toLowerCase()} sont masqués.</p>
           {/if}
         </div>
@@ -334,7 +400,7 @@
           replyAuthor={composerReply ? (view.members[composerReply.authorId]?.name ?? '') : ''}
           readingId={id}
           {scale}
-          max={myProgress}
+          max={reach}
           onSend={sendComment}
         />
       </section>
@@ -375,6 +441,117 @@
     align-items: center;
     flex: 1;
     min-width: 0;
+  }
+  .actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-left: auto;
+  }
+  .settings {
+    position: relative;
+  }
+  .gear {
+    width: 32px;
+    padding: 0;
+  }
+  .gear svg {
+    width: 17px;
+    height: 17px;
+  }
+  .gear[aria-expanded='true'] {
+    border-color: var(--text);
+  }
+  .menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 5;
+    width: min(300px, calc(100vw - 32px));
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    border-radius: 12px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface-2);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  }
+  .menu h3 {
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .setting {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    cursor: pointer;
+  }
+  .setting-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+  }
+  .switch {
+    position: relative;
+    flex-shrink: 0;
+    width: 40px;
+    height: 24px;
+  }
+  .switch input {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .knob {
+    position: absolute;
+    inset: 0;
+    border-radius: 12px;
+    background: var(--border-strong);
+    pointer-events: none;
+    transition: background 0.15s;
+  }
+  .knob::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--text);
+    transition: transform 0.15s;
+  }
+  .switch input:checked + .knob {
+    background: var(--danger);
+  }
+  .switch input:checked + .knob::after {
+    transform: translateX(16px);
+  }
+  .switch input:focus-visible + .knob {
+    outline: 2px solid var(--text);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .knob,
+    .knob::after {
+      transition: none;
+    }
+  }
+  .spoilers-on {
+    padding: 0 8px;
+    border: 1px solid var(--danger);
+    border-radius: 999px;
+    color: var(--danger);
+    font-size: 11px;
+    font-weight: 700;
   }
   .cover {
     width: 44px;
@@ -473,6 +650,15 @@
     flex: 1;
     height: 1px;
     background: var(--border-strong);
+  }
+  .separator.spoiler {
+    color: var(--danger);
+  }
+  .separator.spoiler::before,
+  .separator.spoiler::after {
+    height: 0;
+    border-top: 1px dashed var(--danger);
+    background: none;
   }
   .toast {
     position: fixed;

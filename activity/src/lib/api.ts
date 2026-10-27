@@ -56,6 +56,7 @@ export const api = {
     call<ReadingView>('POST', `${r(id)}/progress`, { value, editionTotal }),
   undo: (id: string) => call<ReadingView>('POST', `${r(id)}/undo`),
   visited: (id: string) => call<null>('POST', `${r(id)}/visited`),
+  spoilers: (id: string, on: boolean) => call<ReadingView>('POST', `${r(id)}/spoilers`, { on }),
   comment: (
     id: string,
     input: { position: number; text: string; gif: Gif | null; replyTo: string | null; photos: string[] },
