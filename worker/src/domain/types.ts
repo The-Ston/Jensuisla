@@ -3,6 +3,14 @@
 export type ProgressUnit = 'chapter' | 'page' | 'percent';
 export type JoinMode = 'invite' | 'open' | 'both';
 export type NotifyPref = 'dm' | 'channel' | 'none';
+export type Theme = 'night' | 'day' | 'paper' | 'forest';
+export type Accent = 'coral' | 'lavender' | 'turquoise' | 'pink';
+
+/** How the Activity looks for one user. A null accent keeps the theme's own. */
+export interface Appearance {
+  theme: Theme;
+  accent: Accent | null;
+}
 
 export type Cover =
   | { kind: 'url'; url: string }
@@ -86,4 +94,6 @@ export interface UserPrefs {
   notify: NotifyPref;
   /** Giphy ids, most recent first. Optional for records written before favorites existed. */
   favoriteGifs?: string[];
+  /** Optional for records written before themes existed. */
+  appearance?: Appearance;
 }

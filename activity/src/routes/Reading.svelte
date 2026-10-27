@@ -476,7 +476,7 @@
     align-items: center;
     padding: 10px 12px 10px 16px;
     border-radius: 10px;
-    background: #2f3240;
+    background: var(--surface-2);
     border: 1px solid var(--border-strong);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
     max-width: calc(100% - 32px);

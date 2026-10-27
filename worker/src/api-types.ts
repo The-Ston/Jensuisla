@@ -1,7 +1,7 @@
 // HTTP contract between the Worker and the Activity (imported by both).
-import type { Comment, Gif, JoinMode, NotifyPref, PhotoRef, ProgressUnit } from './domain/types';
+import type { Accent, Appearance, Comment, Gif, JoinMode, NotifyPref, PhotoRef, ProgressUnit, Theme } from './domain/types';
 
-export type { Comment, Gif, JoinMode, NotifyPref, PhotoRef, ProgressUnit };
+export type { Accent, Appearance, Comment, Gif, JoinMode, NotifyPref, PhotoRef, ProgressUnit, Theme };
 
 export interface MemberView {
   id: string;
@@ -29,7 +29,7 @@ export interface ReadingSummary {
 }
 
 export interface HomeView {
-  me: MemberView & { isOrganizer: boolean; notify: NotifyPref };
+  me: MemberView & { isOrganizer: boolean; notify: NotifyPref; appearance: Appearance };
   readings: ReadingSummary[];
 }
 

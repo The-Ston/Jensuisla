@@ -1,8 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type { HomeView, NotifyPref, ReadingSummary } from '$shared/api-types';
+  import type { Appearance, HomeView, NotifyPref, ReadingSummary } from '$shared/api-types';
+  import AppearanceSettings from '../components/AppearanceSettings.svelte';
   import Avatar from '../components/Avatar.svelte';
   import { api } from '../lib/api';
+  import { applyAppearance } from '../lib/appearance';
   import { progressText } from '../lib/format';
 
   let { onOpen, onCreate }: { onOpen: (id: string) => void; onCreate: () => void } = $props();
@@ -17,6 +19,7 @@
   async function load() {
     try {
       home = await api.home();
+      applyAppearance(home.me.appearance);
       error = '';
     } catch (e) {
       error = e instanceof Error ? e.message : 'Chargement impossible';
@@ -43,6 +46,23 @@
       await api.setNotify(pref);
       if (home) home.me.notify = pref;
     } catch (e) {
+      error = e instanceof Error ? e.message : 'Enregistrement impossible';
+    }
+  }
+
+  // Applied right away; put back if the server refuses it.
+  async function setAppearance(next: Appearance) {
+    if (!home) return;
+    const previous = home.me.appearance;
+    home.me.appearance = next;
+    applyAppearance(next);
+    try {
+      await api.setAppearance(next);
+    } catch (e) {
+      if (home.me.appearance === next) {
+        home.me.appearance = previous;
+        applyAppearance(previous);
+      }
       error = e instanceof Error ? e.message : 'Enregistrement impossible';
     }
   }
@@ -117,15 +137,26 @@
       </section>
     {/if}
 
-    <section class="prefs card">
-      <label class="field">
-        <span>Notifications quand quelqu’un commente ou réagit dans un passage que tu as lu</span>
-        <select class="input" value={home.me.notify} onchange={setNotify}>
-          <option value="dm">Message privé du bot</option>
-          <option value="channel">Mention dans #lectures</option>
-          <option value="none">Aucune</option>
-        </select>
-      </label>
+    <section>
+      <h2>Réglages</h2>
+      <div class="prefs card">
+        <div class="pref">
+          <h3>Apparence</h3>
+          <p class="muted small">Rien que pour toi : les autres lecteurs gardent la leur.</p>
+          <AppearanceSettings appearance={home.me.appearance} onChange={setAppearance} />
+        </div>
+        <div class="pref">
+          <h3>Notifications</h3>
+          <label class="field">
+            <span>Quand quelqu’un commente ou réagit dans un passage que tu as lu</span>
+            <select class="input" value={home.me.notify} onchange={setNotify}>
+              <option value="dm">Message privé du bot</option>
+              <option value="channel">Mention dans #lectures</option>
+              <option value="none">Aucune</option>
+            </select>
+          </label>
+        </div>
+      </div>
     </section>
   {:else if error}
     <p class="error">{error}</p>
@@ -187,7 +218,7 @@
     border-radius: 4px;
     object-fit: cover;
     flex-shrink: 0;
-    background: #3b4a6b;
+    background: var(--surface-2);
   }
   .placeholder {
     display: flex;
@@ -195,7 +226,7 @@
     justify-content: center;
     font-family: var(--font-display);
     font-size: 28px;
-    color: #d6d9e2;
+    color: var(--muted);
   }
   .info {
     display: flex;
@@ -227,5 +258,20 @@
   }
   .prefs {
     padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .pref {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .pref + .pref {
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+  h3 {
+    font-size: 15px;
   }
 </style>

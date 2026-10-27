@@ -147,6 +147,20 @@ describe('Service', () => {
     await expect(ctx.service.toggleFavoriteGif(BRUNO, '../x')).rejects.toThrow(HttpError);
   });
 
+  it('keeps each reader’s appearance, defaulting to the night theme', async () => {
+    expect((await ctx.service.home(BRUNO)).me.appearance).toEqual({ theme: 'night', accent: null });
+    await ctx.service.setNotify(BRUNO, 'none');
+    await ctx.service.setAppearance(BRUNO, 'paper', 'coral');
+    await ctx.service.setAppearance(ALICE, 'day', null);
+
+    const reloaded = await setup(ctx.discord);
+    expect((await reloaded.service.home(BRUNO)).me.appearance).toEqual({ theme: 'paper', accent: 'coral' });
+    expect((await reloaded.service.home(ALICE)).me.appearance).toEqual({ theme: 'day', accent: null });
+    expect(reloaded.store.users.get(BRUNO)?.value.notify).toBe('none');
+    await expect(ctx.service.setAppearance(BRUNO, 'neon' as never, null)).rejects.toThrow(HttpError);
+    await expect(ctx.service.setAppearance(BRUNO, 'day', '#ff0000' as never)).rejects.toThrow(HttpError);
+  });
+
   it('fits the maximum number of favorites in one record', async () => {
     for (let i = 0; i < 70; i++) await ctx.service.toggleFavoriteGif(ALICE, `${'x'.repeat(20)}${i.toString().padStart(4, '0')}`);
     expect(ctx.service.favoriteGifs(ALICE)).toHaveLength(60);

@@ -378,7 +378,7 @@
   .choice.active,
   .member.active {
     border-color: var(--accent);
-    background: rgba(232, 163, 61, 0.15);
+    background: var(--accent-soft);
   }
   .choice input,
   .member input {

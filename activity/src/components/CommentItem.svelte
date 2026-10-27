@@ -315,7 +315,7 @@
   @keyframes flash {
     0%,
     40% {
-      background: rgba(232, 163, 61, 0.22);
+      background: var(--accent-soft);
     }
     100% {
       background: transparent;
@@ -420,7 +420,7 @@
   }
   .pill.mine {
     border-color: var(--accent);
-    background: rgba(232, 163, 61, 0.18);
+    background: var(--accent-soft);
   }
   .pill.add {
     color: var(--muted);
@@ -495,14 +495,14 @@
     margin: 0 1px;
     border-radius: 6px;
     border: 1px solid var(--me);
-    background: rgba(106, 169, 255, 0.15);
+    background: var(--me-soft);
     color: var(--me);
     font: inherit;
     font-weight: 600;
     font-size: 0.92em;
   }
   button.page-ref:hover {
-    background: rgba(106, 169, 255, 0.3);
+    background: var(--me-strong);
   }
   .page-ref.locked {
     border-color: var(--border-strong);

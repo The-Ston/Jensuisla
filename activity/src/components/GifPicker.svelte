@@ -127,7 +127,7 @@
     font-size: 16px;
   }
   .close:hover {
-    background: #4a4d57;
+    background: var(--hover);
   }
   .row {
     display: flex;

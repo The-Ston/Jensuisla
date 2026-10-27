@@ -294,12 +294,13 @@
     font-weight: 700;
   }
   .label.selected {
-    background: #fff;
-    box-shadow: 0 0 0 3px rgba(232, 163, 61, 0.5);
+    background: var(--text);
+    color: var(--bg);
+    box-shadow: 0 0 0 3px var(--accent-ring);
   }
   .here.selected {
-    background: rgba(106, 169, 255, 0.15);
-    box-shadow: 0 0 0 2px rgba(106, 169, 255, 0.5);
+    background: var(--me-soft);
+    box-shadow: 0 0 0 2px var(--me-ring);
   }
   .new {
     position: absolute;

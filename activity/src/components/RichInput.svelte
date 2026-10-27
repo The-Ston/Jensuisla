@@ -284,7 +284,7 @@
     margin: 0 1px;
     border-radius: 6px;
     border: 1px solid var(--me);
-    background: rgba(106, 169, 255, 0.15);
+    background: var(--me-soft);
     color: var(--me);
     font-weight: 600;
     font-size: 0.92em;

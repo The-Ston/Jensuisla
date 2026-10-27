@@ -6,5 +6,8 @@ import '@fontsource/literata/700.css';
 import { mount } from 'svelte';
 import App from './App.svelte';
 import './app.css';
+import { applyCachedAppearance } from './lib/appearance';
+
+applyCachedAppearance();
 
 export default mount(App, { target: document.getElementById('app')! });

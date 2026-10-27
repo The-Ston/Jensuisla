@@ -211,7 +211,7 @@
     background: var(--bg);
   }
   .box:focus-within {
-    border-color: #5a5e6a;
+    border-color: var(--hover);
   }
   .box.with-reply {
     border-top-left-radius: 0;
@@ -253,14 +253,14 @@
     padding: 0 10px;
     border-radius: 16px;
     border: 1px solid var(--me);
-    background: rgba(106, 169, 255, 0.12);
+    background: var(--me-soft);
     color: var(--me);
     font-size: 13px;
     font-weight: 600;
     white-space: nowrap;
   }
   .chip:hover {
-    background: rgba(106, 169, 255, 0.22);
+    background: var(--me-strong);
   }
   .position-input {
     width: 84px;

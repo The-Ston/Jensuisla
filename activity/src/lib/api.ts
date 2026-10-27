@@ -1,4 +1,5 @@
 import type {
+  Appearance,
   BookSuggestion,
   CreateReadingInput,
   CustomEmojiView,
@@ -46,6 +47,7 @@ export const api = {
   favoriteGifs: () => call<Gif[]>('GET', '/gifs/favorites'),
   toggleFavoriteGif: (gifId: string) => call<Gif[]>('POST', '/gifs/favorites', { id: gifId }),
   setNotify: (pref: NotifyPref) => call<null>('PUT', '/me/notify', { pref }),
+  setAppearance: (appearance: Appearance) => call<null>('PUT', '/me/appearance', appearance),
   create: (input: CreateReadingInput) => call<ReadingSummary>('POST', '/readings', input),
   reading: (id: string) => call<ReadingView>('GET', r(id)),
   join: (id: string) => call<ReadingView>('POST', `${r(id)}/join`),

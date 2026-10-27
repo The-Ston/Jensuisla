@@ -3,7 +3,7 @@ import type { CreateReadingInput } from './api-types';
 import { avatarUrl, proxied } from './discord/cdn';
 import { ensureLaunchSetup, OPEN_BUTTON } from './discord/launch';
 import { DiscordRest, fetchOAuthUser } from './discord/rest';
-import type { Gif, NotifyPref } from './domain/types';
+import type { Accent, Gif, NotifyPref, Theme } from './domain/types';
 import type { Env } from './env';
 import { buildNotifications, type NotifyEvent } from './service/notifications';
 import { DEFAULT_NOTIFY, HttpError, Service, type EmojiInfo, type MemberInfo } from './service/service';
@@ -48,6 +48,7 @@ export type Op =
   | { op: 'deleteComment'; readingId: string; commentId: string }
   | { op: 'react'; readingId: string; commentId: string; emoji: string }
   | { op: 'notify'; pref: NotifyPref }
+  | { op: 'appearance'; theme: Theme; accent: Accent | null }
   | { op: 'emojis' }
   | { op: 'favorites' }
   | { op: 'toggleFavorite'; gifId: string };
@@ -208,6 +209,9 @@ export class JensuislaStore extends DurableObject<Env> {
         break;
       case 'notify':
         await s.setNotify(userId, op.pref);
+        return null;
+      case 'appearance':
+        await s.setAppearance(userId, op.theme, op.accent);
         return null;
       case 'emojis':
         return s.listEmojis();

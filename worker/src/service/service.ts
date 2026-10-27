@@ -31,6 +31,8 @@ import {
   undoProgress,
 } from '../domain/progress';
 import type {
+  Accent,
+  Appearance,
   Comment,
   Gif,
   JoinMode,
@@ -38,6 +40,7 @@ import type {
   Participant,
   PhotoRef,
   ProgressUnit,
+  Theme,
   UserPrefs,
 } from '../domain/types';
 import { gifFromId, GIPHY_ID } from '../gifs';
@@ -81,6 +84,9 @@ const UNITS: ProgressUnit[] = ['chapter', 'page', 'percent'];
 const JOIN_MODES: JoinMode[] = ['invite', 'open', 'both'];
 const NOTIFY_PREFS: NotifyPref[] = ['dm', 'channel', 'none'];
 export const DEFAULT_NOTIFY: NotifyPref = 'dm';
+const THEMES: Theme[] = ['night', 'day', 'paper', 'forest'];
+const ACCENTS: Accent[] = ['coral', 'lavender', 'turquoise', 'pink'];
+const DEFAULT_APPEARANCE: Appearance = { theme: 'night', accent: null };
 const GIF_HOST = /^https:\/\/(media\d*|i)\.giphy\.com\//;
 
 function fallbackMember(id: string): MemberView {
@@ -146,7 +152,8 @@ export class Service {
       .sort((a, b) => b.reading.createdAt - a.reading.createdAt)
       .map((e) => this.summary(e, userId));
     const { isOrganizer, ...view } = me;
-    return { me: { ...view, isOrganizer, notify: this.notifyPref(userId) }, readings };
+    const appearance = this.prefs(userId).appearance ?? DEFAULT_APPEARANCE;
+    return { me: { ...view, isOrganizer, notify: this.notifyPref(userId), appearance }, readings };
   }
 
   async listMembers(): Promise<MemberView[]> {
@@ -492,6 +499,13 @@ export class Service {
   async setNotify(userId: string, notify: NotifyPref): Promise<void> {
     if (!NOTIFY_PREFS.includes(notify)) throw new HttpError(400, 'Préférence invalide');
     await this.store.saveUserPrefs({ ...this.prefs(userId), notify });
+  }
+
+  async setAppearance(userId: string, theme: Theme, accent: Accent | null): Promise<void> {
+    if (!THEMES.includes(theme) || (accent !== null && !ACCENTS.includes(accent))) {
+      throw new HttpError(400, 'Apparence invalide');
+    }
+    await this.store.saveUserPrefs({ ...this.prefs(userId), appearance: { theme, accent } });
   }
 
   favoriteGifs(userId: string): Gif[] {

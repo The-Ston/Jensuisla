@@ -120,6 +120,9 @@ function toOp(method: string, parts: string[], data: Record<string, any>): Op | 
   if (resource === 'members' && method === 'GET') return { op: 'members' };
   if (resource === 'emojis' && method === 'GET') return { op: 'emojis' };
   if (resource === 'me' && id === 'notify' && method === 'PUT') return { op: 'notify', pref: data.pref };
+  if (resource === 'me' && id === 'appearance' && method === 'PUT') {
+    return { op: 'appearance', theme: data.theme, accent: data.accent ?? null };
+  }
   if (resource !== 'readings') return null;
   if (!id) return method === 'POST' ? { op: 'create', input: data as any } : null;
   if (!sub) return method === 'GET' ? { op: 'view', readingId: id } : null;
