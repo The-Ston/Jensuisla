@@ -1,6 +1,16 @@
 import { HISTORY_LIMIT } from './limits';
 import type { Participant, ProgressUnit, Reading } from './types';
 
+/** The unit a reader sees and types: their own (pages <-> percent), or the reading's. */
+export function readerUnit(reading: Pick<Reading, 'unit'>, participant: Pick<Participant, 'ownUnit'>): ProgressUnit {
+  return participant.ownUnit ?? reading.unit;
+}
+
+/** Whether positions are converted to the reader's own scale, hence only approximate. */
+export function isConverted(reading: Pick<Reading, 'total'>, participant: Pick<Participant, 'editionTotal'>): boolean {
+  return !!participant.editionTotal && participant.editionTotal !== reading.total;
+}
+
 export function clampPosition(reading: Pick<Reading, 'total'>, value: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(reading.total, Math.round(value)));

@@ -3,14 +3,16 @@ import { fromReference, toReference } from '$shared/domain/progress';
 import { positionText } from './format';
 
 /**
- * How positions are shown to the current reader. Positions are stored in the reference
- * edition; a reader with another edition (page unit only) sees and types their own pages.
+ * How positions are shown to the current reader. Positions are stored in the reading's unit and
+ * reference edition; a reader with another edition sees and types their own pages, and one
+ * following percent in a page reading (or pages in a percent one) sees and types that unit.
  */
 export interface Scale {
+  /** Unit the reader sees and types. */
   unit: ProgressUnit;
   /** Reference total. */
   total: number;
-  /** The reader's edition page count, when it differs from the reference. */
+  /** Total of the reader's own scale (edition pages, or 100 for percent), when it differs from the reference. */
   edition: number | null;
   /** The reader's own progress, which they typed: shown exactly, never as a conversion. */
   mine: { progress: number; shown: number } | null;
@@ -19,11 +21,11 @@ export interface Scale {
 export function makeScale(
   unit: ProgressUnit,
   total: number,
-  editionTotal: number | null,
+  own: { unit: ProgressUnit; editionTotal: number | null } | null = null,
   mine: { progress: number; shown: number } | null = null,
 ): Scale {
-  const edition = unit === 'page' && editionTotal && editionTotal !== total ? editionTotal : null;
-  return { unit, total, edition, mine: edition ? mine : null };
+  const edition = unit !== 'chapter' && own?.editionTotal && own.editionTotal !== total ? own.editionTotal : null;
+  return { unit: own?.unit ?? unit, total, edition, mine: edition ? mine : null };
 }
 
 const isMine = (scale: Scale, position: number) => scale.mine !== null && position === scale.mine.progress;
@@ -44,10 +46,9 @@ export function displayTotal(scale: Scale): number {
   return scale.edition ?? scale.total;
 }
 
-/** Label of a reference position in the reader's scale; "≈" marks a converted page. */
+/** Label of a reference position in the reader's scale; "≈" marks a converted position. */
 export function scaleLabel(scale: Scale, position: number): string {
-  const text = positionText(scale.unit, toDisplay(scale, position));
-  return scale.edition && position > 0 && !isMine(scale, position) ? text.replace(/^Page /, 'Page ≈ ') : text;
+  return positionText(scale.unit, toDisplay(scale, position), !!scale.edition && !isMine(scale, position));
 }
 
 /** Label of a span of positions, e.g. a timeline point grouping nearby comments. */

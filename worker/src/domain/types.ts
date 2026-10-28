@@ -36,8 +36,13 @@ export interface Participant {
   userId: string;
   /** Progress in reference units (0 = not started). */
   progress: number;
-  /** Page count of this reader's own edition (page unit only), null = reference edition. */
+  /**
+   * Total of this reader's own scale, null = the reading's: page count of their edition, or 100
+   * when they follow percent in a page reading.
+   */
   editionTotal: number | null;
+  /** Unit this reader follows instead of the reading's (pages <-> percent). Optional for older records. */
+  ownUnit?: ProgressUnit | null;
   /** Page the reader typed in their own edition, shown back as is (conversion rounds). */
   editionProgress?: number | null;
   /** Previous progress values, most recent last, used by "undo". */

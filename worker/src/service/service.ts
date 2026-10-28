@@ -27,6 +27,7 @@ import {
   clampPosition,
   fromReference,
   newParticipant,
+  readerUnit,
   toReference,
   undoProgress,
 } from '../domain/progress';
@@ -143,8 +144,9 @@ export class Service {
       canJoin: !me && r.joinMode !== 'invite',
       canInvite: r.organizerId === userId && r.joinMode !== 'open',
       myProgress: me?.progress ?? null,
+      myUnit: me ? readerUnit(r, me) : r.unit,
       myShownProgress: me ? (me.editionProgress ?? fromReference(me.progress, me.editionTotal, r.total)) : null,
-      myShownTotal: (r.unit === 'page' && me?.editionTotal) || r.total,
+      myShownTotal: me?.editionTotal || r.total,
       unread,
     };
   }
@@ -244,6 +246,7 @@ export class Service {
       participants: [...entry.participants.values()].map(({ value }) => ({ userId: value.userId, progress: value.progress })),
       me: me && {
         progress: me.progress,
+        unit: readerUnit(entry.reading, me),
         editionTotal: me.editionTotal,
         shownProgress: me.editionProgress ?? fromReference(me.progress, me.editionTotal, entry.reading.total),
         canUndo: me.history.length > 0,
@@ -270,22 +273,37 @@ export class Service {
     await this.addParticipants(entry, userIds, await this.deps.members());
   }
 
-  /** `value` is expressed in the reader's own edition when `editionTotal` is given (page unit only). */
-  async setProgress(userId: string, readingId: string, value: number, editionTotal: number | null): Promise<void> {
+  /**
+   * `value` is expressed in the reader's own scale: in `unit` when they follow percent in a page
+   * reading or pages in a percent one, out of `editionTotal` pages when they give one.
+   */
+  async setProgress(
+    userId: string,
+    readingId: string,
+    value: number,
+    editionTotal: number | null,
+    unit: ProgressUnit | null = null,
+  ): Promise<void> {
     const entry = this.entry(readingId);
     const current = this.participant(entry, userId);
     const r = entry.reading;
+    // Pages and percent convert to each other; chapters don't.
+    const ownUnit = r.unit !== 'chapter' && unit !== r.unit && (unit === 'page' || unit === 'percent') ? unit : null;
     let edition: number | null = null;
-    if (r.unit === 'page' && editionTotal !== null && editionTotal !== r.total) {
-      if (!Number.isInteger(editionTotal) || editionTotal < 1 || editionTotal > MAX_TOTAL)
-        throw new HttpError(400, 'Nombre de pages invalide');
-      edition = editionTotal;
+    if (ownUnit === 'percent') edition = 100;
+    else if (r.unit === 'page' || ownUnit === 'page') {
+      if (editionTotal !== null && (ownUnit || editionTotal !== r.total)) {
+        if (!Number.isInteger(editionTotal) || editionTotal < 1 || editionTotal > MAX_TOTAL)
+          throw new HttpError(400, 'Nombre de pages invalide');
+        edition = editionTotal;
+      } else if (ownUnit) throw new HttpError(400, 'Indique le nombre de pages de ton livre');
     }
     if (!Number.isFinite(value)) throw new HttpError(400, 'Avancement invalide');
     const reference = clampPosition(r, toReference(value, edition, r.total));
     const next = {
       ...applyProgress(current, reference),
       editionTotal: edition,
+      ownUnit,
       editionProgress: edition ? Math.max(0, Math.min(edition, Math.round(value))) : null,
     };
     await this.store.saveParticipant(readingId, next);

@@ -1,6 +1,6 @@
 import { canSee } from '../domain/access';
 import { mentionLabel, renderPageRefs } from '../domain/page-refs';
-import { fromReference } from '../domain/progress';
+import { fromReference, isConverted, readerUnit } from '../domain/progress';
 import type { NotifyPref, ProgressUnit } from '../domain/types';
 import type { DataStore } from '../store/data-store';
 
@@ -22,7 +22,7 @@ export type Outgoing =
 const MAX_LINES = 10;
 const MAX_CONTENT = 1900;
 
-/** `approx`: the page was converted to another edition, so it is only close. */
+/** `approx`: the position was converted to another scale, so it is only close. */
 export function positionLabel(unit: ProgressUnit, position: number, approx = false): string {
   if (position === 0) return 'avant de commencer';
   switch (unit) {
@@ -31,7 +31,7 @@ export function positionLabel(unit: ProgressUnit, position: number, approx = fal
     case 'page':
       return approx ? `vers la page ${position}` : `à la page ${position}`;
     case 'percent':
-      return `à ${position} %`;
+      return approx ? `vers ${position} %` : `à ${position} %`;
   }
 }
 
@@ -86,14 +86,15 @@ export function buildNotifications(
       const relevant = readingEvents.filter((e) => e.actorId !== p.userId && canSee(e.position, p.progress));
       if (relevant.length === 0) continue;
       if (pref === 'dm') {
-        const approx = !!p.editionTotal && p.editionTotal !== total;
-        // Page mentions in excerpts are shown in the recipient's edition.
-        const pages = (pos: number) => mentionLabel(unit, fromReference(pos, p.editionTotal, total), approx);
+        // Positions and mentions in excerpts are shown in the recipient's own scale.
+        const own = readerUnit(entry.reading, p);
+        const approx = isConverted(entry.reading, p);
+        const shown = (pos: number) => fromReference(pos, p.editionTotal, total);
         const lines = relevant.map((e) =>
           describe(
-            { ...e, excerpt: renderPageRefs(e.excerpt, pages) },
+            { ...e, excerpt: renderPageRefs(e.excerpt, (pos) => mentionLabel(own, shown(pos), approx)) },
             nameOf(e.actorId),
-            positionLabel(unit, fromReference(e.position, p.editionTotal, total), !!p.editionTotal && p.editionTotal !== total),
+            positionLabel(own, shown(e.position), approx),
             true,
             e.targetAuthorId === p.userId ? 'toi' : nameOf(e.targetAuthorId ?? ''),
           ),
@@ -106,9 +107,11 @@ export function buildNotifications(
 
     if (mentionIds.size > 0) {
       // Visible to the whole channel: no excerpts, only who did what where.
-      // Shared message: pages of the reference edition, said explicitly if some read another one.
+      // Shared message: pages of the reference edition, said explicitly if some read another one
+      // (or follow percent).
       const mixedEditions =
-        unit === 'page' && [...entry.participants.values()].some(({ value }) => value.editionTotal && value.editionTotal !== total);
+        unit === 'page' &&
+        [...entry.participants.values()].some(({ value }) => isConverted(entry.reading, value) || !!value.ownUnit);
       for (const e of readingEvents) {
         const where = positionLabel(unit, e.position) + (mixedEditions && e.position > 0 ? ' (édition de référence)' : '');
         channelLines.push(describe(e, nameOf(e.actorId), where, false, nameOf(e.targetAuthorId ?? '')));

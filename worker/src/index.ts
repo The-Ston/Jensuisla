@@ -133,7 +133,13 @@ function toOp(method: string, parts: string[], data: Record<string, any>): Op | 
       case 'invite':
         return { op: 'invite', readingId: id, userIds: Array.isArray(data.userIds) ? data.userIds : [] };
       case 'progress':
-        return { op: 'progress', readingId: id, value: Number(data.value), editionTotal: data.editionTotal ?? null };
+        return {
+          op: 'progress',
+          readingId: id,
+          value: Number(data.value),
+          editionTotal: data.editionTotal ?? null,
+          unit: data.unit ?? null,
+        };
       case 'undo':
         return { op: 'undo', readingId: id };
       case 'visited':

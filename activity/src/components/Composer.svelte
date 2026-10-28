@@ -143,7 +143,7 @@
     <div class="anchor">
       {#if editingPosition}
         <label class="sr-only" for="comment-position">
-          Position du commentaire ({toDisplay(scale, min)} à {toDisplay(scale, max)}{scale.edition ? ', pages de ton édition' : ''})
+          Position du commentaire ({toDisplay(scale, min)} à {toDisplay(scale, max)}{scale.edition && scale.unit === 'page' ? ', pages de ton édition' : ''})
         </label>
         <input
           id="comment-position"
@@ -176,7 +176,7 @@
         ? 'Écrire un commentaire… (p.25 devient une page cliquable)'
         : scale.unit === 'chapter'
           ? 'Écrire un commentaire… (ch.3 devient un chapitre cliquable)'
-          : 'Écrire un commentaire…'}
+          : 'Écrire un commentaire… (10% devient une position cliquable)'}
       {scale}
       bind:value={text}
       bind:this={input}

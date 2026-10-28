@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy, onMount, tick, untrack } from 'svelte';
-  import type { Comment, Gif, MemberView, ReadingView } from '$shared/api-types';
+  import type { Comment, Gif, MemberView, ProgressUnit, ReadingView } from '$shared/api-types';
   import Avatar from '../components/Avatar.svelte';
   import CommentItem from '../components/CommentItem.svelte';
   import Composer from '../components/Composer.svelte';
@@ -35,12 +35,12 @@
   const reach = $derived(spoilers ? (view?.reading.total ?? 0) : myProgress);
   let settingsOpen = $state(false);
   let settingsEl: HTMLElement | undefined = $state();
-  // Everything is shown in the reader's own edition when they have one (page unit).
+  // Everything is shown in the reader's own scale: their edition, or percent <-> pages.
   const scale = $derived(
     makeScale(
       view?.reading.unit ?? 'chapter',
       view?.reading.total ?? 1,
-      view?.me?.editionTotal ?? null,
+      view?.me ? { unit: view.me.unit, editionTotal: view.me.editionTotal } : null,
       view?.me ? { progress: view.me.progress, shown: view.me.shownProgress } : null,
     ),
   );
@@ -135,8 +135,8 @@
     toast = { text, timer: setTimeout(() => (toast = null), TOAST_MS) };
   }
 
-  async function changeProgress(value: number, editionTotal: number | null) {
-    await mutate(() => api.progress(id, value, editionTotal));
+  async function changeProgress(value: number, editionTotal: number | null, unit: ProgressUnit) {
+    await mutate(() => api.progress(id, value, editionTotal, unit));
     if (view?.me) showToast(`Avancement enregistré : ${scaleLabel(scale, view.me.progress)}`);
   }
 
@@ -237,7 +237,7 @@
           <h1>{reading.title}</h1>
           <p class="muted">
             {reading.author ? `${reading.author} · ` : ''}{displayTotal(scale)}
-            {reading.unit === 'chapter' ? 'chapitres' : reading.unit === 'page' ? 'pages' : '%'}{scale.edition ? ' (ton édition)' : ''} · {view.participants.length} lecteur{view.participants.length > 1 ? 's' : ''}
+            {scale.unit === 'chapter' ? 'chapitres' : scale.unit === 'page' ? 'pages' : '%'}{scale.edition && scale.unit === 'page' ? ' (ton édition)' : ''} · {view.participants.length} lecteur{view.participants.length > 1 ? 's' : ''}
           </p>
         </div>
       </div>

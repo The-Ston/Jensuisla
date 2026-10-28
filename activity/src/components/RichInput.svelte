@@ -4,10 +4,11 @@
   import { displayTotal, fromDisplay, toDisplay, type Scale } from '../lib/scale';
 
   /**
-   * Text input where page or chapter mentions ("p.25", "ch.3"), in the reading's unit only, turn
-   * into tags as you type, like options of a Discord bot command. Backspace right after a tag
-   * turns it back into the text typed. The value is plain text in which tags are stored as
-   * tokens holding the position (reference-edition page, or chapter).
+   * Text input where page, chapter or percent mentions ("p.25", "ch.3", "10%"), in the reader's
+   * unit only, turn into tags as you type, like options of a Discord bot command. Backspace right
+   * after a tag turns it back into the text typed. The value is plain text in which tags are
+   * stored as tokens holding the position in the reading's unit (reference-edition page,
+   * chapter, or percent).
    */
   let {
     value = $bindable(),
@@ -30,15 +31,17 @@
   // Last value produced by this editor: lets us tell our own updates from external ones.
   let lastValue: string | null = null;
 
-  // "p.25", "p 25", "p25", "page 25", "pages 25", or "ch.3", "chap 3", "chapitre 3".
-  const WORDS: Partial<Record<Scale['unit'], string>> = { page: 'p\\.?|pages?', chapter: 'ch(?:ap)?\\.?|chapitres?' };
-  const mention = (end: string, flags: string) =>
-    new RegExp(`(?<=^|[\\s(«"'’])(?:${WORDS[scale.unit]})\\s?(\\d{1,5})${end}`, flags);
+  // "p.25", "p 25", "p25", "page 25", "pages 25", or "ch.3", "chap 3", "chapitre 3", or "10%", "10 %".
+  const PATTERNS: Record<Scale['unit'], string> = {
+    page: '(?:p\\.?|pages?)\\s?(\\d{1,5})',
+    chapter: '(?:ch(?:ap)?\\.?|chapitres?)\\s?(\\d{1,5})',
+    percent: '(\\d{1,3})\\s?%',
+  };
+  const mention = (end: string, flags: string) => new RegExp(`(?<=^|[\\s(«"'’])${PATTERNS[scale.unit]}${end}`, flags);
   // Once followed by a space or punctuation.
   const MENTION = $derived(mention(`(?=[\\s.,;:!?)»"'’])`, 'gi'));
   // Same, ending the text: only used when sending, as the mention can't be "finished" by typing.
   const MENTION_AT_END = $derived(mention('$', 'i'));
-  const mentionsEnabled = $derived(scale.unit in WORDS);
 
   export function focus() {
     el?.focus();
@@ -105,7 +108,7 @@
 
   /** Converts a mention left at the very end, then returns the final value. */
   export function finalize(): string {
-    if (el && mentionsEnabled) {
+    if (el) {
       const last = lastTextNode();
       const m = last && MENTION_AT_END.exec(last.data);
       if (last && m && inBook(m)) replaceWithTag(last, m);
@@ -131,7 +134,8 @@
     const shown = Number(m[1]);
     const after = node.splitText(m.index!);
     const rest = after.splitText(m[0].length);
-    const tag = chip(fromDisplay(scale, shown), shown);
+    // A coarser reading unit could round an early mention down to 0 (p.1 of 352 in percent).
+    const tag = chip(Math.max(1, fromDisplay(scale, shown)), shown);
     tag.dataset.typed = m[0];
     after.replaceWith(tag);
     return rest;
@@ -161,7 +165,7 @@
    * into text stays text.
    */
   function convertBeforeCaret() {
-    if (!el || !mentionsEnabled) return;
+    if (!el) return;
     const at = caret();
     if (!at) return;
     const from = pasteFrom ? (pasteFrom.node === at.node ? pasteFrom.offset : 0) : at.offset - 1;

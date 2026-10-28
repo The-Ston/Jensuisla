@@ -111,7 +111,7 @@
               {#if reading.author}<span class="muted">{reading.author}</span>{/if}
               <span class="progress">
                 <span class="bar"><span style:width="{((reading.myProgress ?? 0) / reading.total) * 100}%"></span></span>
-                {progressText(reading.unit, reading.myShownProgress ?? 0, reading.myShownTotal)}
+                {progressText(reading.myUnit, reading.myShownProgress ?? 0, reading.myShownTotal)}
               </span>
               <span class="muted small">{reading.participantCount} lecteur{reading.participantCount > 1 ? 's' : ''}</span>
             </span>

@@ -74,7 +74,7 @@ describe('RichInput', () => {
   });
 
   it('converts pages typed in another edition to the reference', () => {
-    const { el, props } = setup(makeScale('page', 352, 410));
+    const { el, props } = setup(makeScale('page', 352, { unit: 'page', editionTotal: 410 }));
     type(el, 'p.120 ');
     expect(props.value).toBe('[[p:103]] ');
     expect(el.querySelector('.page-chip')?.textContent).toBe('p. 120');
@@ -113,7 +113,7 @@ describe('RichInput', () => {
   });
 
   it('shows existing tags when editing', () => {
-    const { el } = setup(makeScale('page', 352, 410), 'cf [[p:103]] ok');
+    const { el } = setup(makeScale('page', 352, { unit: 'page', editionTotal: 410 }), 'cf [[p:103]] ok');
     expect(el.querySelector('.page-chip')?.textContent).toBe('p. 120');
   });
 
@@ -142,9 +142,44 @@ describe('RichInput', () => {
     expect(props.value).toBe('ch.5 ');
   });
 
-  it('leaves percent readings alone', () => {
-    const { el, props } = setup(makeScale('percent', 100, null));
-    type(el, 'p.5 ch.5 ');
-    expect(props.value).toBe('p.5 ch.5 ');
+  it('tags percents, not pages, in percent readings', () => {
+    for (const [typed, expected] of [
+      ['vers 10% ', 'vers [[p:10]] '],
+      ['(25 %)', '([[p:25]])'],
+      ['p.5 ch.5 ', 'p.5 ch.5 '],
+      ['150% ', '150% '], // beyond the book
+    ]) {
+      const { el, props } = setup(makeScale('percent', 100, null));
+      type(el, typed);
+      expect(props.value).toBe(expected);
+      unmount(component!);
+      component = null;
+    }
+    const { el, api } = setup(makeScale('percent', 100, null));
+    type(el, 'voir 10%');
+    expect(api.finalize()).toBe('voir [[p:10]]');
+    expect(el.querySelector('.page-chip')?.textContent).toBe('10 %');
+  });
+
+  it('converts percents to pages for a reader following percent in a page reading', () => {
+    const { el, props } = setup(makeScale('page', 352, { unit: 'percent', editionTotal: 100 }));
+    type(el, 'p.5 10% ');
+    expect(props.value).toBe('p.5 [[p:35]] ');
+    expect(el.querySelector('.page-chip')?.textContent).toBe('10 %');
+  });
+
+  it('shows page tags in percent to a reader following percent, and the other way round', () => {
+    const percentReader = setup(makeScale('page', 352, { unit: 'percent', editionTotal: 100 }), 'cf [[p:35]]');
+    expect(percentReader.el.querySelector('.page-chip')?.textContent).toBe('10 %');
+    unmount(component!);
+    component = null;
+    const pageReader = setup(makeScale('percent', 100, { unit: 'page', editionTotal: 352 }), 'cf [[p:10]]');
+    expect(pageReader.el.querySelector('.page-chip')?.textContent).toBe('p. 35');
+  });
+
+  it('never tags a page as position 0 when converting to a coarser unit', () => {
+    const { el, props } = setup(makeScale('percent', 100, { unit: 'page', editionTotal: 352 }));
+    type(el, 'p.1 ');
+    expect(props.value).toBe('[[p:1]] ');
   });
 });

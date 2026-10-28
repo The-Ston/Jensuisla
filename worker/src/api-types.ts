@@ -23,7 +23,8 @@ export interface ReadingSummary {
   canJoin: boolean;
   canInvite: boolean;
   myProgress: number | null;
-  /** The reader's progress and total in their own edition (page unit), for display. */
+  /** The reader's unit, progress and total in their own scale (edition, or pages <-> percent), for display. */
+  myUnit: ProgressUnit;
   myShownProgress: number | null;
   myShownTotal: number;
   /** Comments by others, visible to the caller, written since their last visit. */
@@ -43,6 +44,9 @@ export interface ParticipantView {
 export interface MyProgressView {
   /** Reference units. */
   progress: number;
+  /** Unit the reader follows: the reading's, or pages <-> percent. */
+  unit: ProgressUnit;
+  /** Total of the reader's own scale (edition pages, or 100 for percent), null = the reading's. */
   editionTotal: number | null;
   /** Progress as the reader sees it: in their own edition when they have one. */
   shownProgress: number;

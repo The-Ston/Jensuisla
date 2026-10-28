@@ -3,7 +3,7 @@ import type { CreateReadingInput } from './api-types';
 import { avatarUrl, proxied } from './discord/cdn';
 import { ensureLaunchSetup, OPEN_BUTTON } from './discord/launch';
 import { DiscordRest, fetchOAuthUser } from './discord/rest';
-import type { Accent, Gif, NotifyPref, Theme } from './domain/types';
+import type { Accent, Gif, NotifyPref, ProgressUnit, Theme } from './domain/types';
 import type { Env } from './env';
 import { buildNotifications, type NotifyEvent } from './service/notifications';
 import { DEFAULT_NOTIFY, HttpError, Service, type EmojiInfo, type MemberInfo } from './service/service';
@@ -23,7 +23,7 @@ export type Op =
   | { op: 'view'; readingId: string }
   | { op: 'join'; readingId: string }
   | { op: 'invite'; readingId: string; userIds: string[] }
-  | { op: 'progress'; readingId: string; value: number; editionTotal: number | null }
+  | { op: 'progress'; readingId: string; value: number; editionTotal: number | null; unit: ProgressUnit | null }
   | { op: 'undo'; readingId: string }
   | { op: 'visited'; readingId: string }
   | { op: 'spoilers'; readingId: string; on: boolean }
@@ -177,7 +177,7 @@ export class JensuislaStore extends DurableObject<Env> {
         await s.invite(userId, op.readingId, op.userIds);
         break;
       case 'progress':
-        await s.setProgress(userId, op.readingId, op.value, op.editionTotal);
+        await s.setProgress(userId, op.readingId, op.value, op.editionTotal, op.unit);
         break;
       case 'undo':
         await s.undoProgress(userId, op.readingId);

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ChannelType } from '../src/discord/api';
 import { buildNotifications, type NotifyEvent } from '../src/service/notifications';
+import type { ProgressUnit } from '../src/domain/types';
 import { HttpError, Service, type MemberInfo } from '../src/service/service';
 import { CATEGORY_NAME, DataStore } from '../src/store/data-store';
 import { FakeDiscord } from './fake-discord';
@@ -34,7 +35,7 @@ async function setup(discord = new FakeDiscord()) {
   return { discord, store, service, events };
 }
 
-async function createBook(service: Service, unit: 'chapter' | 'page' = 'chapter', total = 22) {
+async function createBook(service: Service, unit: ProgressUnit = 'chapter', total = 22) {
   return service.createReading(ALICE, {
     title: 'Le Livre',
     author: 'Quelqu’un',
@@ -351,6 +352,44 @@ describe('Service', () => {
 
     await ctx.service.undoProgress(BRUNO, book.id);
     expect((await ctx.service.readingView(BRUNO, book.id)).me?.shownProgress).toBe(0);
+  });
+
+  it('lets a reader follow percent in a page reading', async () => {
+    const book = await createBook(ctx.service, 'page', 352);
+    await ctx.service.setProgress(BRUNO, book.id, 50, null, 'percent');
+    const view = await ctx.service.readingView(BRUNO, book.id);
+    expect(view.me).toMatchObject({ progress: 176, unit: 'percent', editionTotal: 100, shownProgress: 50 });
+    expect(view.reading).toMatchObject({ myUnit: 'percent', myShownProgress: 50, myShownTotal: 100 });
+
+    // Positions and mentions reach them in percent.
+    await ctx.service.setProgress(ALICE, book.id, 100, null);
+    await ctx.service.addComment(ALICE, book.id, { position: 100, text: 'cf [[p:35]]', gif: null });
+    const out = buildNotifications(ctx.events, ctx.store, (id) => id, () => 'dm');
+    const dm = out.find((o) => o.kind === 'dm' && o.userId === BRUNO)?.content;
+    expect(dm).toContain('vers 28 %');
+    expect(dm).toContain('cf ≈ 10 %');
+
+    // Back to pages.
+    await ctx.service.setProgress(BRUNO, book.id, 200, null, 'page');
+    expect((await ctx.service.readingView(BRUNO, book.id)).me).toMatchObject({ progress: 200, unit: 'page', editionTotal: null });
+  });
+
+  it('lets a reader follow pages in a percent reading', async () => {
+    const book = await createBook(ctx.service, 'percent', 100);
+    await expect(ctx.service.setProgress(BRUNO, book.id, 120, null, 'page')).rejects.toThrow(/nombre de pages/);
+    await ctx.service.setProgress(BRUNO, book.id, 176, 352, 'page');
+    expect((await ctx.service.readingView(BRUNO, book.id)).me).toMatchObject({
+      progress: 50,
+      unit: 'page',
+      editionTotal: 352,
+      shownProgress: 176,
+    });
+  });
+
+  it('keeps chapter readers in chapters', async () => {
+    const book = await createBook(ctx.service, 'chapter', 22);
+    await ctx.service.setProgress(BRUNO, book.id, 5, null, 'percent');
+    expect((await ctx.service.readingView(BRUNO, book.id)).me).toMatchObject({ progress: 5, unit: 'chapter', editionTotal: null });
   });
 
   it('respects invitation-only readings', async () => {

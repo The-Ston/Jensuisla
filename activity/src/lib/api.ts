@@ -8,6 +8,7 @@ import type {
   MemberView,
   NotifyPref,
   PhotoRef,
+  ProgressUnit,
   ReadingSummary,
   ReadingView,
 } from '$shared/api-types';
@@ -52,8 +53,8 @@ export const api = {
   reading: (id: string) => call<ReadingView>('GET', r(id)),
   join: (id: string) => call<ReadingView>('POST', `${r(id)}/join`),
   invite: (id: string, userIds: string[]) => call<ReadingView>('POST', `${r(id)}/invite`, { userIds }),
-  progress: (id: string, value: number, editionTotal: number | null) =>
-    call<ReadingView>('POST', `${r(id)}/progress`, { value, editionTotal }),
+  progress: (id: string, value: number, editionTotal: number | null, unit: ProgressUnit) =>
+    call<ReadingView>('POST', `${r(id)}/progress`, { value, editionTotal, unit }),
   undo: (id: string) => call<ReadingView>('POST', `${r(id)}/undo`),
   visited: (id: string) => call<null>('POST', `${r(id)}/visited`),
   spoilers: (id: string, on: boolean) => call<ReadingView>('POST', `${r(id)}/spoilers`, { on }),

@@ -1,14 +1,16 @@
 import type { ProgressUnit } from '$shared/api-types';
 
-export function positionText(unit: ProgressUnit, position: number): string {
+/** `approx`: the position was converted to another scale, so it is only close ("Page ≈ 34"). */
+export function positionText(unit: ProgressUnit, position: number, approx = false): string {
   if (position === 0) return 'Avant de commencer';
+  const near = approx ? '≈ ' : '';
   switch (unit) {
     case 'chapter':
       return `Chapitre ${position}`;
     case 'page':
-      return `Page ${position}`;
+      return `Page ${near}${position}`;
     case 'percent':
-      return `${position} %`;
+      return `${near}${position} %`;
   }
 }
 
