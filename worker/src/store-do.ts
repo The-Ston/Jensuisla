@@ -73,6 +73,8 @@ export class JensuislaStore extends DurableObject<Env> {
   private tokens = new Map<string, { userId: string; at: number }>();
   private dmChannels = new Map<string, string>();
   private pending: NotifyEvent[] = [];
+  /** Edits being sent to Discord, outside of the request queue. */
+  private flushing: Promise<void> | null = null;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -85,6 +87,7 @@ export class JensuislaStore extends DurableObject<Env> {
     this.service ??= DataStore.load(this.api, {
       guildId: this.env.DISCORD_GUILD_ID,
       botUserId: this.env.DISCORD_APPLICATION_ID,
+      onPendingEdits: () => this.flushEdits(),
     })
       .then((store) => {
         this.store = store;
@@ -101,6 +104,23 @@ export class JensuislaStore extends DurableObject<Env> {
         throw err;
       });
     return this.service;
+  }
+
+  /**
+   * Sends waiting edits to Discord after the request answered, so users never wait for Discord's
+   * rate limits. Edits made meanwhile join the same run; a single run at a time keeps their order.
+   */
+  private flushEdits() {
+    if (this.flushing || !this.store) return;
+    const store = this.store;
+    this.flushing = store
+      .flush()
+      .catch((err) => console.error('flush failed', err))
+      .finally(() => {
+        this.flushing = null;
+        if (store.hasPendingEdits) this.flushEdits();
+      });
+    this.ctx.waitUntil(this.flushing);
   }
 
   private async getMembers(): Promise<Map<string, MemberInfo>> {

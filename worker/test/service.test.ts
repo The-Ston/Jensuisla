@@ -467,3 +467,66 @@ describe('Service', () => {
     expect(out[0]!.content).not.toContain('wow'); // no excerpt in the shared channel
   });
 });
+
+describe('edits sent after answering', () => {
+  it('answers from memory, then sends one edit per record however many were made', async () => {
+    const discord = new FakeDiscord();
+    let flushes = 0;
+    const store = await DataStore.load(discord, { guildId: GUILD, botUserId: BOT, onPendingEdits: () => flushes++ });
+    const service = new Service({
+      store,
+      members: async () => members(),
+      emojis: async () => new Map(),
+      signPhoto: async () => '',
+      onEvent: () => undefined,
+    });
+    const book = await createBook(service);
+    await service.setProgress(BRUNO, book.id, 1, null); // first save creates the record, right away
+
+    const before = discord.calls;
+    for (const on of [true, false, true, false, true]) await service.setSpoilers(BRUNO, book.id, on);
+    await service.setProgress(BRUNO, book.id, 4, null);
+    // Nothing sent yet, but the reader already sees the result.
+    expect(discord.calls).toBe(before);
+    expect(flushes).toBeGreaterThan(0);
+    expect((await service.readingView(BRUNO, book.id)).me).toMatchObject({ progress: 4, spoilers: true });
+
+    await store.flush();
+    expect(discord.calls).toBe(before + 1);
+    expect(store.hasPendingEdits).toBe(false);
+    const reloaded = await setup(discord);
+    expect((await reloaded.service.readingView(BRUNO, book.id)).me).toMatchObject({ progress: 4, spoilers: true });
+  });
+
+  it('retries a failed edit a few times, then gives up without blocking the others', async () => {
+    const discord = new FakeDiscord();
+    const store = await DataStore.load(discord, { guildId: GUILD, botUserId: BOT, onPendingEdits: () => undefined });
+    const service = new Service({
+      store,
+      members: async () => members(),
+      emojis: async () => new Map(),
+      signPhoto: async () => '',
+      onEvent: () => undefined,
+    });
+    const book = await createBook(service);
+    await service.setProgress(ALICE, book.id, 1, null);
+    await service.setProgress(BRUNO, book.id, 1, null);
+    await store.flush();
+
+    const edit = discord.editMessage.bind(discord);
+    let failures = 0;
+    discord.editMessage = async (channelId, messageId, body) => {
+      if (body.content?.includes(`"userId":"${ALICE}"`)) {
+        failures++;
+        throw new Error('discord down');
+      }
+      return edit(channelId, messageId, body);
+    };
+    await service.setProgress(ALICE, book.id, 5, null);
+    await service.setProgress(BRUNO, book.id, 6, null);
+    await store.flush();
+    expect(failures).toBe(3);
+    expect(store.hasPendingEdits).toBe(false);
+    expect((await (await setup(discord)).service.readingView(BRUNO, book.id)).me?.progress).toBe(6);
+  });
+});

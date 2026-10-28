@@ -22,7 +22,15 @@ export interface ReadingEntry {
 export interface StoreConfig {
   guildId: string;
   botUserId: string;
+  /**
+   * Called when edits of existing records are waiting to be sent: the caller runs `flush()`
+   * soon, outside of the request. Without it, edits are sent before the write returns.
+   */
+  onPendingEdits?: () => void;
 }
+
+/** An edit failing this many times in a row is given up (logged): memory stays the reference. */
+const MAX_EDIT_ATTEMPTS = 3;
 
 function slug(text: string): string {
   const s = text
@@ -39,10 +47,16 @@ function slug(text: string): string {
  * In-memory copy of all Jensuisla data, persisted as bot messages in hidden Discord channels:
  * a private category with one channel for user preferences and one channel per reading.
  * Not concurrency-safe on its own: callers must serialize writes.
+ *
+ * Edits of existing records (progress, reactions, preferences…) update memory right away and
+ * reach Discord afterwards, quick successive edits of one record becoming a single call: Discord
+ * slows down bursts of edits in a channel by several seconds, which users would otherwise wait for.
  */
 export class DataStore {
   readonly readings = new Map<string, ReadingEntry>();
   readonly users = new Map<string, Stored<UserPrefs>>();
+  /** Latest content waiting to be sent, by message id, oldest first. */
+  private readonly pendingEdits = new Map<string, { channelId: string; content: string; attempts: number }>();
 
   private constructor(
     private readonly api: DiscordApi,
@@ -160,7 +174,7 @@ export class DataStore {
     const content = encode({ t: 'participant', v: participant });
     const existing = entry.participants.get(participant.userId);
     if (existing) {
-      await this.api.editMessage(readingId, existing.messageId, { content });
+      await this.edit(readingId, existing.messageId, content);
       existing.value = participant;
     } else {
       const msg = await this.api.createMessage(readingId, { content });
@@ -179,13 +193,14 @@ export class DataStore {
   async saveComment(readingId: string, comment: Comment): Promise<void> {
     const entry = this.mustGet(readingId);
     const { id, ...data } = comment;
-    await this.api.editMessage(readingId, id, { content: encode({ t: 'comment', v: data }) });
+    await this.edit(readingId, id, encode({ t: 'comment', v: data }));
     entry.comments.set(id, comment);
   }
 
   async deleteComment(readingId: string, commentId: string): Promise<void> {
     const entry = this.mustGet(readingId);
     await this.api.deleteMessage(readingId, commentId);
+    this.pendingEdits.delete(commentId);
     entry.comments.delete(commentId);
   }
 
@@ -213,11 +228,47 @@ export class DataStore {
     const content = encode({ t: 'user', v: prefs });
     const existing = this.users.get(prefs.userId);
     if (existing) {
-      await this.api.editMessage(this.usersChannelId, existing.messageId, { content });
+      await this.edit(this.usersChannelId, existing.messageId, content);
       existing.value = prefs;
     } else {
       const msg = await this.api.createMessage(this.usersChannelId, { content });
       this.users.set(prefs.userId, { value: prefs, messageId: msg.id });
+    }
+  }
+
+  get hasPendingEdits(): boolean {
+    return this.pendingEdits.size > 0;
+  }
+
+  /** Edits an existing record: queued for `flush()`, or sent right away without `onPendingEdits`. */
+  private async edit(channelId: string, messageId: string, content: string): Promise<void> {
+    // Deleted first so that the record moves to the end: edits are sent in the order made.
+    this.pendingEdits.delete(messageId);
+    this.pendingEdits.set(messageId, { channelId, content, attempts: 0 });
+    if (this.config.onPendingEdits) this.config.onPendingEdits();
+    else await this.flush();
+  }
+
+  /**
+   * Sends waiting edits, oldest first, until none is left (including those queued meanwhile).
+   * Must not run twice at once.
+   */
+  async flush(): Promise<void> {
+    for (;;) {
+      const next = this.pendingEdits.entries().next();
+      if (next.done) return;
+      const [messageId, edit] = next.value;
+      this.pendingEdits.delete(messageId);
+      try {
+        await this.api.editMessage(edit.channelId, messageId, { content: edit.content });
+      } catch (err) {
+        // Sent right away: the caller sees the failure, as before.
+        if (!this.config.onPendingEdits) throw err;
+        console.error('edit failed', messageId, err);
+        // A newer edit of the same record replaces this one anyway.
+        if (edit.attempts + 1 < MAX_EDIT_ATTEMPTS && !this.pendingEdits.has(messageId))
+          this.pendingEdits.set(messageId, { ...edit, attempts: edit.attempts + 1 });
+      }
     }
   }
 
