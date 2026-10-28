@@ -50,6 +50,8 @@ export interface Participant {
   lastVisit: { at: number; progress: number } | null;
   /** Shows (and allows writing) past the reader's progress. Optional for older records. */
   spoilers?: boolean;
+  /** With spoilers, commenting past the progress moves the progress there. Optional for older records. */
+  autoAdvance?: boolean;
 }
 
 export interface Gif {

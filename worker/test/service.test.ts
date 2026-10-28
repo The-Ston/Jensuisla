@@ -173,6 +173,36 @@ describe('Service', () => {
     expect((await ctx.service.readingView(BRUNO, book.id)).comments).toEqual([]);
   });
 
+  it('moves the progress to a comment written ahead, when the reader asked for it', async () => {
+    const book = await createBook(ctx.service);
+    await ctx.service.setProgress(BRUNO, book.id, 5, null);
+    await ctx.service.setSpoilers(BRUNO, book.id, true);
+    await ctx.service.addComment(BRUNO, book.id, { position: 8, text: 'sans suivre', gif: null });
+    expect((await ctx.service.readingView(BRUNO, book.id)).me?.progress).toBe(5);
+
+    await ctx.service.setAutoAdvance(BRUNO, book.id, true);
+    await ctx.service.addComment(BRUNO, book.id, { position: 3, text: 'en arrière', gif: null });
+    expect((await ctx.service.readingView(BRUNO, book.id)).me?.progress).toBe(5); // never moves back
+    await ctx.service.addComment(BRUNO, book.id, { position: 9, text: 'je suis là', gif: null });
+    expect((await ctx.service.readingView(BRUNO, book.id)).me).toMatchObject({ progress: 9, autoAdvance: true });
+
+    // It can be undone like any progress change.
+    await ctx.service.undoProgress(BRUNO, book.id);
+    expect((await ctx.service.readingView(BRUNO, book.id)).me?.progress).toBe(5);
+
+    // Without spoilers, the option does nothing, even left on: writing ahead is refused and the
+    // progress stays put.
+    await ctx.service.setSpoilers(BRUNO, book.id, false);
+    await expect(ctx.service.addComment(BRUNO, book.id, { position: 9, text: 'non', gif: null })).rejects.toThrow(HttpError);
+    await ctx.service.addComment(BRUNO, book.id, { position: 5, text: 'ici', gif: null });
+    expect((await ctx.service.readingView(BRUNO, book.id)).me).toMatchObject({ progress: 5, autoAdvance: true, spoilers: false });
+
+    // Turning spoilers back on brings the option back as it was.
+    await ctx.service.setSpoilers(BRUNO, book.id, true);
+    await ctx.service.addComment(BRUNO, book.id, { position: 11, text: 'de retour', gif: null });
+    expect((await ctx.service.readingView(BRUNO, book.id)).me?.progress).toBe(11);
+  });
+
   it('counts unread comments on the home page: visible, by others, since the last visit', async () => {
     const book = await createBook(ctx.service);
     await ctx.service.setProgress(ALICE, book.id, 13, null);

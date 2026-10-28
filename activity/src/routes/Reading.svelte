@@ -31,6 +31,7 @@
   const reading = $derived(view?.reading);
   const myProgress = $derived(view?.me?.progress ?? 0);
   const spoilers = $derived(!!view?.me?.spoilers);
+  const autoAdvance = $derived(!!view?.me?.autoAdvance);
   // How far the reader can read and write: the whole book once they chose to see spoilers.
   const reach = $derived(spoilers ? (view?.reading.total ?? 0) : myProgress);
   let settingsOpen = $state(false);
@@ -162,6 +163,14 @@
     }
   }
 
+  async function toggleAutoAdvance() {
+    try {
+      await mutate(() => api.autoAdvance(id, !autoAdvance));
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Enregistrement impossible';
+    }
+  }
+
   function closeSettingsOutside(event: MouseEvent) {
     if (settingsOpen && settingsEl && !settingsEl.contains(event.target as Node)) settingsOpen = false;
   }
@@ -182,8 +191,12 @@
     }
   }
 
-  const sendComment = (text: string, gif: Gif | null, position: number, replyTo: string | null, photos: string[]) =>
-    mutate(() => api.comment(id, { position, text, gif, replyTo, photos }));
+  async function sendComment(text: string, gif: Gif | null, position: number, replyTo: string | null, photos: string[]) {
+    const before = myProgress;
+    await mutate(() => api.comment(id, { position, text, gif, replyTo, photos }));
+    // Commenting ahead moved the progress (auto-advance): say so, with a way back.
+    if (view?.me && view.me.progress > before) showToast(`Avancement passé à ${scaleLabel(scale, view.me.progress).toLowerCase()}`);
+  }
 
   function replyTo(comment: Comment) {
     composerReply = comment;
@@ -269,6 +282,19 @@
                   </span>
                   <span class="switch">
                     <input type="checkbox" role="switch" checked={spoilers} onchange={toggleSpoilers} />
+                    <span class="knob" aria-hidden="true"></span>
+                  </span>
+                </label>
+                <!-- Only means something with spoilers: without them, writing ahead isn't possible. -->
+                <label class="setting" class:disabled={!spoilers}>
+                  <span class="setting-text">
+                    <strong>Avancer en commentant</strong>
+                    <span class="muted small">
+                      {spoilers ? 'Commenter après ta position y déplace ton avancement.' : 'Active « Voir les spoilers » pour l’utiliser.'}
+                    </span>
+                  </span>
+                  <span class="switch calm">
+                    <input type="checkbox" role="switch" checked={spoilers && autoAdvance} disabled={!spoilers} onchange={toggleAutoAdvance} />
                     <span class="knob" aria-hidden="true"></span>
                   </span>
                 </label>
@@ -531,6 +557,16 @@
   }
   .switch input:checked + .knob {
     background: var(--danger);
+  }
+  .switch.calm input:checked + .knob {
+    background: var(--me);
+  }
+  .setting.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .setting.disabled .switch input {
+    cursor: not-allowed;
   }
   .switch input:checked + .knob::after {
     transform: translateX(16px);

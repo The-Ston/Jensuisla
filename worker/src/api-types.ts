@@ -54,6 +54,8 @@ export interface MyProgressView {
   lastVisit: { at: number; progress: number } | null;
   /** Comments past the progress are shown too, and can be written. */
   spoilers: boolean;
+  /** With spoilers, commenting past the progress moves the progress there. */
+  autoAdvance: boolean;
 }
 
 export interface ReadingView {

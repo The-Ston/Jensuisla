@@ -146,6 +146,8 @@ function toOp(method: string, parts: string[], data: Record<string, any>): Op | 
         return { op: 'visited', readingId: id };
       case 'spoilers':
         return { op: 'spoilers', readingId: id, on: data.on === true };
+      case 'auto-advance':
+        return { op: 'autoAdvance', readingId: id, on: data.on === true };
       case 'comments':
         return {
           op: 'comment',

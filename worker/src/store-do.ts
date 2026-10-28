@@ -27,6 +27,7 @@ export type Op =
   | { op: 'undo'; readingId: string }
   | { op: 'visited'; readingId: string }
   | { op: 'spoilers'; readingId: string; on: boolean }
+  | { op: 'autoAdvance'; readingId: string; on: boolean }
   | {
       op: 'comment';
       readingId: string;
@@ -187,6 +188,9 @@ export class JensuislaStore extends DurableObject<Env> {
         return null;
       case 'spoilers':
         await s.setSpoilers(userId, op.readingId, op.on);
+        break;
+      case 'autoAdvance':
+        await s.setAutoAdvance(userId, op.readingId, op.on);
         break;
       case 'comment':
         await s.addComment(userId, op.readingId, op);

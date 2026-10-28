@@ -58,6 +58,7 @@ export const api = {
   undo: (id: string) => call<ReadingView>('POST', `${r(id)}/undo`),
   visited: (id: string) => call<null>('POST', `${r(id)}/visited`),
   spoilers: (id: string, on: boolean) => call<ReadingView>('POST', `${r(id)}/spoilers`, { on }),
+  autoAdvance: (id: string, on: boolean) => call<ReadingView>('POST', `${r(id)}/auto-advance`, { on }),
   comment: (
     id: string,
     input: { position: number; text: string; gif: Gif | null; replyTo: string | null; photos: string[] },

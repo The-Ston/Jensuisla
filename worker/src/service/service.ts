@@ -252,6 +252,7 @@ export class Service {
         canUndo: me.history.length > 0,
         lastVisit: me.lastVisit,
         spoilers: !!me.spoilers,
+        autoAdvance: !!me.autoAdvance,
       },
       comments,
       members,
@@ -323,6 +324,12 @@ export class Service {
     await this.store.saveParticipant(readingId, { ...p, spoilers });
   }
 
+  async setAutoAdvance(userId: string, readingId: string, autoAdvance: boolean): Promise<void> {
+    const entry = this.entry(readingId);
+    const p = this.participant(entry, userId);
+    await this.store.saveParticipant(readingId, { ...p, autoAdvance });
+  }
+
   async markVisited(userId: string, readingId: string): Promise<void> {
     const entry = this.entry(readingId);
     const p = this.participant(entry, userId);
@@ -361,6 +368,10 @@ export class Service {
       createdAt: this.now(),
       editedAt: null,
     });
+    // Commenting ahead with spoilers on: the reader may want their progress to follow. Kept in
+    // the history, so it can be undone; the position is shown converted, never as typed.
+    if (me.spoilers && me.autoAdvance && comment.position > me.progress)
+      await this.store.saveParticipant(readingId, { ...applyProgress(me, comment.position), editionProgress: null });
     this.deps.onEvent({
       readingId,
       kind: original ? 'reply' : text ? 'comment' : photos.length ? 'photo' : 'gif',
