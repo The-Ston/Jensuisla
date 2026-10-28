@@ -1,8 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type { Appearance, HomeView, NotifyPref, ReadingSummary } from '$shared/api-types';
+  import type { Appearance, CommentColor, HomeView, NotifyPref, ReadingSummary } from '$shared/api-types';
   import AppearanceSettings from '../components/AppearanceSettings.svelte';
   import Avatar from '../components/Avatar.svelte';
+  import CommentColorPicker from '../components/CommentColorPicker.svelte';
   import { api } from '../lib/api';
   import { applyAppearance } from '../lib/appearance';
   import { progressText } from '../lib/format';
@@ -46,6 +47,19 @@
       await api.setNotify(pref);
       if (home) home.me.notify = pref;
     } catch (e) {
+      error = e instanceof Error ? e.message : 'Enregistrement impossible';
+    }
+  }
+
+  // Shown right away; put back if the server refuses it.
+  async function setCommentColor(next: CommentColor | null) {
+    if (!home) return;
+    const previous = home.me.commentColor;
+    home.me.commentColor = next;
+    try {
+      await api.setCommentColor(next);
+    } catch (e) {
+      if (home.me.commentColor === next) home.me.commentColor = previous;
       error = e instanceof Error ? e.message : 'Enregistrement impossible';
     }
   }
@@ -152,6 +166,11 @@
           <h3>Apparence</h3>
           <p class="muted small">Rien que pour toi : les autres lecteurs gardent la leur.</p>
           <AppearanceSettings appearance={home.me.appearance} onChange={setAppearance} />
+        </div>
+        <div class="pref">
+          <h3>Couleur de mes commentaires</h3>
+          <p class="muted small">Tout le monde verra tes commentaires écrits de cette couleur.</p>
+          <CommentColorPicker color={home.me.commentColor} onChange={setCommentColor} />
         </div>
         <div class="pref">
           <h3>Notifications</h3>

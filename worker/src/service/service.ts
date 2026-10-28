@@ -35,6 +35,7 @@ import type {
   Accent,
   Appearance,
   Comment,
+  CommentColor,
   Gif,
   JoinMode,
   NotifyPref,
@@ -88,6 +89,7 @@ export const DEFAULT_NOTIFY: NotifyPref = 'dm';
 const THEMES: Theme[] = ['night', 'day', 'paper', 'forest'];
 const ACCENTS: Accent[] = ['coral', 'lavender', 'turquoise', 'pink'];
 const DEFAULT_APPEARANCE: Appearance = { theme: 'night', accent: null };
+const COMMENT_COLORS: CommentColor[] = ['red', 'orange', 'green', 'blue', 'violet', 'pink'];
 const GIF_HOST = /^https:\/\/(media\d*|i)\.giphy\.com\//;
 
 function fallbackMember(id: string): MemberView {
@@ -160,8 +162,10 @@ export class Service {
       .sort((a, b) => b.reading.createdAt - a.reading.createdAt)
       .map((e) => this.summary(e, userId));
     const { isOrganizer, ...view } = me;
-    const appearance = this.prefs(userId).appearance ?? DEFAULT_APPEARANCE;
-    return { me: { ...view, isOrganizer, notify: this.notifyPref(userId), appearance }, readings };
+    const prefs = this.prefs(userId);
+    const appearance = prefs.appearance ?? DEFAULT_APPEARANCE;
+    const commentColor = prefs.commentColor ?? null;
+    return { me: { ...view, isOrganizer, notify: this.notifyPref(userId), appearance, commentColor }, readings };
   }
 
   async listMembers(): Promise<MemberView[]> {
@@ -233,7 +237,8 @@ export class Service {
     const members: Record<string, MemberView> = {};
     for (const id of memberIds) {
       const m = all.get(id);
-      members[id] = m ? { id: m.id, name: m.name, avatarUrl: m.avatarUrl } : fallbackMember(id);
+      const commentColor = this.store.users.get(id)?.value.commentColor ?? null;
+      members[id] = m ? { id: m.id, name: m.name, avatarUrl: m.avatarUrl, commentColor } : fallbackMember(id);
     }
     // Signed links only for photos of comments this reader is allowed to see.
     const photoUrls: Record<string, string> = {};
@@ -549,6 +554,11 @@ export class Service {
       throw new HttpError(400, 'Apparence invalide');
     }
     await this.store.saveUserPrefs({ ...this.prefs(userId), appearance: { theme, accent } });
+  }
+
+  async setCommentColor(userId: string, color: CommentColor | null): Promise<void> {
+    if (color !== null && !COMMENT_COLORS.includes(color)) throw new HttpError(400, 'Couleur invalide');
+    await this.store.saveUserPrefs({ ...this.prefs(userId), commentColor: color });
   }
 
   favoriteGifs(userId: string): Gif[] {

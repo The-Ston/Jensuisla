@@ -1,6 +1,7 @@
 import type {
   Appearance,
   BookSuggestion,
+  CommentColor,
   CreateReadingInput,
   CustomEmojiView,
   Gif,
@@ -49,6 +50,7 @@ export const api = {
   toggleFavoriteGif: (gifId: string) => call<Gif[]>('POST', '/gifs/favorites', { id: gifId }),
   setNotify: (pref: NotifyPref) => call<null>('PUT', '/me/notify', { pref }),
   setAppearance: (appearance: Appearance) => call<null>('PUT', '/me/appearance', appearance),
+  setCommentColor: (color: CommentColor | null) => call<null>('PUT', '/me/comment-color', { color }),
   create: (input: CreateReadingInput) => call<ReadingSummary>('POST', '/readings', input),
   reading: (id: string) => call<ReadingView>('GET', r(id)),
   join: (id: string) => call<ReadingView>('POST', `${r(id)}/join`),

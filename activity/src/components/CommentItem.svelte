@@ -5,6 +5,7 @@
   import { parseCustomKey } from '$shared/domain/reactions';
   import { emojis } from '../lib/emojis.svelte';
   import { img, timeAgo } from '../lib/format';
+  import { inkColor } from '../lib/appearance';
   import { scaleLabel, type Scale } from '../lib/scale';
   import Avatar from './Avatar.svelte';
   import EmojiPicker from './EmojiPicker.svelte';
@@ -219,7 +220,7 @@
     {:else}
       {#if comment.text}
         <!-- Kept on one line: the paragraph preserves whitespace (pre-wrap). -->
-        <p>{#each splitPageRefs(comment.text) as seg, i (i)}{#if seg.kind === 'text'}{seg.text}{:else if seg.position <= myProgress}<button class="page-ref" title="Aller à ce passage" onclick={() => onJumpToPosition(seg.position)}>{pageLabel(seg.position)}</button>{:else}<span class="page-ref locked" title="Tu n’y es pas encore">{pageLabel(seg.position)} 🔒</span>{/if}{/each}</p>
+        <p style:color={inkColor(author?.commentColor)}>{#each splitPageRefs(comment.text) as seg, i (i)}{#if seg.kind === 'text'}{seg.text}{:else if seg.position <= myProgress}<button class="page-ref" title="Aller à ce passage" onclick={() => onJumpToPosition(seg.position)}>{pageLabel(seg.position)}</button>{:else}<span class="page-ref locked" title="Tu n’y es pas encore">{pageLabel(seg.position)} 🔒</span>{/if}{/each}</p>
       {/if}
       {#if comment.photos?.length}
         <PhotoGrid photos={comment.photos} urls={photoUrls} />

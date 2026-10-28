@@ -5,6 +5,8 @@ export type JoinMode = 'invite' | 'open' | 'both';
 export type NotifyPref = 'dm' | 'channel' | 'none';
 export type Theme = 'night' | 'day' | 'paper' | 'forest';
 export type Accent = 'coral' | 'lavender' | 'turquoise' | 'pink';
+/** Color of a user's comment text, seen by everyone (each theme shows a readable shade of it). */
+export type CommentColor = 'red' | 'orange' | 'green' | 'blue' | 'violet' | 'pink';
 
 /** How the Activity looks for one user. A null accent keeps the theme's own. */
 export interface Appearance {
@@ -105,4 +107,6 @@ export interface UserPrefs {
   favoriteGifs?: string[];
   /** Optional for records written before themes existed. */
   appearance?: Appearance;
+  /** Null or missing = the theme's text color. */
+  commentColor?: CommentColor | null;
 }

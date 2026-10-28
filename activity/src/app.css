@@ -84,6 +84,28 @@
   --accent-ink: #16171b;
 }
 
+/* Comment colors, chosen by each author and seen by everyone (see lib/appearance.ts): a light
+   shade on dark themes and a deep one on light themes, so they stay readable everywhere. */
+:root,
+[data-theme='night'],
+[data-theme='forest'] {
+  --ink-red: #ff7b72;
+  --ink-orange: #ffa657;
+  --ink-green: #7ee787;
+  --ink-blue: #79c0ff;
+  --ink-violet: #d2a8ff;
+  --ink-pink: #ff8ccf;
+}
+[data-theme='day'],
+[data-theme='paper'] {
+  --ink-red: #c62828;
+  --ink-orange: #a84a00;
+  --ink-green: #27702b;
+  --ink-blue: #1565c0;
+  --ink-violet: #7b1fa2;
+  --ink-pink: #ad1457;
+}
+
 /* Derived tones, recomputed wherever the theme or accent changes. */
 :root,
 [data-theme],

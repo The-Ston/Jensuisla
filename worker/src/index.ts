@@ -123,6 +123,9 @@ function toOp(method: string, parts: string[], data: Record<string, any>): Op | 
   if (resource === 'me' && id === 'appearance' && method === 'PUT') {
     return { op: 'appearance', theme: data.theme, accent: data.accent ?? null };
   }
+  if (resource === 'me' && id === 'comment-color' && method === 'PUT') {
+    return { op: 'commentColor', color: data.color ?? null };
+  }
   if (resource !== 'readings') return null;
   if (!id) return method === 'POST' ? { op: 'create', input: data as any } : null;
   if (!sub) return method === 'GET' ? { op: 'view', readingId: id } : null;

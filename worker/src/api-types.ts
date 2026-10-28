@@ -1,12 +1,25 @@
 // HTTP contract between the Worker and the Activity (imported by both).
-import type { Accent, Appearance, Comment, Gif, JoinMode, NotifyPref, PhotoRef, ProgressUnit, Theme } from './domain/types';
+import type {
+  Accent,
+  Appearance,
+  Comment,
+  CommentColor,
+  Gif,
+  JoinMode,
+  NotifyPref,
+  PhotoRef,
+  ProgressUnit,
+  Theme,
+} from './domain/types';
 
-export type { Accent, Appearance, Comment, Gif, JoinMode, NotifyPref, PhotoRef, ProgressUnit, Theme };
+export type { Accent, Appearance, Comment, CommentColor, Gif, JoinMode, NotifyPref, PhotoRef, ProgressUnit, Theme };
 
 export interface MemberView {
   id: string;
   name: string;
   avatarUrl: string;
+  /** Color the member's comments are written in, for everyone. Null = the theme's text color. */
+  commentColor?: CommentColor | null;
 }
 
 export interface ReadingSummary {
@@ -32,7 +45,7 @@ export interface ReadingSummary {
 }
 
 export interface HomeView {
-  me: MemberView & { isOrganizer: boolean; notify: NotifyPref; appearance: Appearance };
+  me: MemberView & { isOrganizer: boolean; notify: NotifyPref; appearance: Appearance; commentColor: CommentColor | null };
   readings: ReadingSummary[];
 }
 

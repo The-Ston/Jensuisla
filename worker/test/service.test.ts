@@ -231,6 +231,26 @@ describe('Service', () => {
     expect((await reloaded.service.home(ALICE)).me.appearance).toEqual({ theme: 'day', accent: null });
     expect(reloaded.store.users.get(BRUNO)?.value.notify).toBe('none');
     await expect(ctx.service.setAppearance(BRUNO, 'neon' as never, null)).rejects.toThrow(HttpError);
+  });
+
+  it('shows each author’s comment color to every reader', async () => {
+    const book = await createBook(ctx.service);
+    expect((await ctx.service.home(ALICE)).me.commentColor).toBeNull();
+    await ctx.service.setCommentColor(ALICE, 'red');
+    expect((await ctx.service.home(ALICE)).me.commentColor).toBe('red');
+
+    await ctx.service.setProgress(ALICE, book.id, 3, null);
+    await ctx.service.setProgress(BRUNO, book.id, 3, null);
+    await ctx.service.addComment(ALICE, book.id, { position: 2, text: 'en rouge', gif: null });
+    const members = (await ctx.service.readingView(BRUNO, book.id)).members;
+    expect(members[ALICE]?.commentColor).toBe('red');
+    expect(members[BRUNO]?.commentColor).toBeNull();
+
+    const reloaded = await setup(ctx.discord);
+    expect((await reloaded.service.home(ALICE)).me.commentColor).toBe('red');
+    await ctx.service.setCommentColor(ALICE, null);
+    expect((await ctx.service.home(ALICE)).me.commentColor).toBeNull();
+    await expect(ctx.service.setCommentColor(ALICE, 'fuchsia' as never)).rejects.toThrow(HttpError);
     await expect(ctx.service.setAppearance(BRUNO, 'day', '#ff0000' as never)).rejects.toThrow(HttpError);
   });
 

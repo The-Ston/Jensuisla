@@ -1,4 +1,4 @@
-import type { Accent, Appearance, Theme } from '$shared/api-types';
+import type { Accent, Appearance, CommentColor, Theme } from '$shared/api-types';
 
 export const THEMES: { id: Theme; name: string }[] = [
   { id: 'night', name: 'Nuit' },
@@ -14,6 +14,21 @@ export const ACCENTS: { id: Accent | null; name: string }[] = [
   { id: 'turquoise', name: 'Turquoise' },
   { id: 'pink', name: 'Rose' },
 ];
+
+export const COMMENT_COLORS: { id: CommentColor | null; name: string }[] = [
+  { id: null, name: 'Par défaut' },
+  { id: 'red', name: 'Rouge' },
+  { id: 'orange', name: 'Orange' },
+  { id: 'green', name: 'Vert' },
+  { id: 'blue', name: 'Bleu' },
+  { id: 'violet', name: 'Violet' },
+  { id: 'pink', name: 'Rose' },
+];
+
+/** CSS color of a comment text, in a shade readable on the viewer's theme. */
+export function inkColor(color: CommentColor | null | undefined): string | undefined {
+  return color ? `var(--ink-${color})` : undefined;
+}
 
 const CACHE_KEY = 'jensuisla.appearance';
 
