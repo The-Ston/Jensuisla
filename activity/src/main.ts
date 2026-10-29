@@ -9,5 +9,7 @@ import './app.css';
 import { applyCachedAppearance } from './lib/appearance';
 
 applyCachedAppearance();
+// Discord tells the Activity where it runs; on mobile it floats its own bar over the page.
+document.documentElement.dataset.platform = new URLSearchParams(location.search).get('platform') ?? 'desktop';
 
 export default mount(App, { target: document.getElementById('app')! });

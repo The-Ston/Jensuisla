@@ -249,8 +249,7 @@
         <div>
           <h1>{reading.title}</h1>
           <p class="muted">
-            {reading.author ? `${reading.author} · ` : ''}{displayTotal(scale)}
-            {scale.unit === 'chapter' ? 'chapitres' : scale.unit === 'page' ? 'pages' : '%'}{scale.edition && scale.unit === 'page' ? ' (ton édition)' : ''} · {view.participants.length} lecteur{view.participants.length > 1 ? 's' : ''}
+            {reading.author ? `${reading.author} · ` : ''}{displayTotal(scale)}&nbsp;{scale.unit === 'chapter' ? 'chapitres' : scale.unit === 'page' ? 'pages' : '%'}{scale.edition && scale.unit === 'page' ? ' (ton édition)' : ''} · {view.participants.length} lecteur{view.participants.length > 1 ? 's' : ''}
           </p>
         </div>
       </div>
