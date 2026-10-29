@@ -12,7 +12,11 @@ import { applyCachedAppearance } from './lib/appearance';
 applyCachedAppearance();
 // Discord tells the Activity where it runs; on mobile it floats its own bar over the page.
 document.documentElement.dataset.platform = new URLSearchParams(location.search).get('platform') ?? 'desktop';
-document.addEventListener('visibilitychange', () => sendPresence(document.hidden ? 'hidden' : 'visible'));
-window.addEventListener('pagehide', () => sendPresence('leave'));
+// Presence is only traced in #jsl-log, which is off: turn both on together.
+const TRACE_PRESENCE = false;
+if (TRACE_PRESENCE) {
+  document.addEventListener('visibilitychange', () => sendPresence(document.hidden ? 'hidden' : 'visible'));
+  window.addEventListener('pagehide', () => sendPresence('leave'));
+}
 
 export default mount(App, { target: document.getElementById('app')! });

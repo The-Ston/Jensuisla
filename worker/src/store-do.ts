@@ -17,6 +17,8 @@ const TOKEN_TTL_MS = 10 * 60_000;
 const NOTIFY_DELAY_MS = 60_000;
 const LOG_MAX = 1900;
 const PENDING_PREFIX = 'pending:';
+/** Traces to #jsl-log, for diagnosis only: each line costs Discord calls. */
+const LOG_TO_DISCORD = false;
 
 export type Op =
   | { op: 'home' }
@@ -174,7 +176,7 @@ export class JensuislaStore extends DurableObject<Env> {
     const user = await fetchOAuthUser(accessToken);
     if (!user) return null;
     this.tokens.set(accessToken, { userId: user.id, at: Date.now() });
-    if (!cached) this.log(this.getMembers().then((m) => [`🔑 Connexion de ${m.get(user.id)?.name ?? user.id}`]));
+    if (!cached) this.log(() => this.getMembers().then((m) => [`🔑 Connexion de ${m.get(user.id)?.name ?? user.id}`]));
     return user.id;
   }
 
@@ -186,7 +188,7 @@ export class JensuislaStore extends DurableObject<Env> {
       leave: '👋 Déconnexion',
     };
     const label = what[state];
-    if (label) this.log(this.getMembers().then((m) => [`${label} : ${m.get(userId)?.name ?? userId}`]));
+    if (label) this.log(() => this.getMembers().then((m) => [`${label} : ${m.get(userId)?.name ?? userId}`]));
   }
 
   async run(userId: string, op: Op): Promise<OpResult> {
@@ -308,10 +310,11 @@ export class JensuislaStore extends DurableObject<Env> {
    * Posts lines to the hidden log channel (and the Worker logs). Never fails the caller;
    * lines are sent in order, split to fit Discord's message size.
    */
-  private log(lines: string[] | Promise<string[]>) {
+  private log(lines: string[] | (() => Promise<string[]>)) {
+    if (!LOG_TO_DISCORD) return;
     // Taken now: the line may only reach Discord after earlier ones.
     const at = new Date().toLocaleTimeString('fr-FR', { timeZone: 'Europe/Paris' });
-    const ready = Promise.all([lines, this.getService()]);
+    const ready = Promise.all([typeof lines === 'function' ? lines() : lines, this.getService()]);
     this.logging = this.logging
       .then(() => ready)
       .then(async ([lines]) => {
@@ -341,7 +344,7 @@ export class JensuislaStore extends DurableObject<Env> {
         if ((await this.ctx.storage.getAlarm()) === null) await this.ctx.storage.setAlarm(Date.now() + NOTIFY_DELAY_MS);
       })(),
     );
-    this.log(
+    this.log(() =>
       this.getMembers().then((m) => [
         `📝 En attente : ${event.kind} de ${m.get(event.actorId)?.name ?? event.actorId} en ${event.position}`,
       ]),
