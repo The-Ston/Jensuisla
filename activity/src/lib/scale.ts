@@ -1,6 +1,6 @@
 import type { ProgressUnit } from '$shared/api-types';
 import { fromReference, toReference } from '$shared/domain/progress';
-import { positionText } from './format';
+import { positionText, rangeText } from './format';
 
 /**
  * How positions are shown to the current reader. Positions are stored in the reading's unit and
@@ -55,5 +55,7 @@ export function scaleLabel(scale: Scale, position: number): string {
 export function rangeLabel(scale: Scale, start: number, end: number): string {
   const from = toDisplay(scale, start);
   const to = toDisplay(scale, end);
-  return from === to ? scaleLabel(scale, start) : `${scaleLabel(scale, start)} à ${to}`;
+  return from === to
+    ? scaleLabel(scale, start)
+    : rangeText(scale.unit, from, to, !!scale.edition && !isMine(scale, start));
 }

@@ -14,6 +14,29 @@ export function positionText(unit: ProgressUnit, position: number, approx = fals
   }
 }
 
+/** A span of positions, the unit said once: "Pages 12 à 18", "Chapitres 3 à 5", "67 à 68 %". */
+export function rangeText(unit: ProgressUnit, from: number, to: number, approx = false): string {
+  const near = approx ? '≈ ' : '';
+  if (from === 0) {
+    switch (unit) {
+      case 'chapter':
+        return `Du début au chapitre ${to}`;
+      case 'page':
+        return `Du début à la page ${near}${to}`;
+      case 'percent':
+        return `Du début à ${near}${to} %`;
+    }
+  }
+  switch (unit) {
+    case 'chapter':
+      return `Chapitres ${from} à ${to}`;
+    case 'page':
+      return `Pages ${near}${from} à ${to}`;
+    case 'percent':
+      return `${near}${from} à ${to} %`;
+  }
+}
+
 export function progressText(unit: ProgressUnit, progress: number, total: number): string {
   switch (unit) {
     case 'chapter':
