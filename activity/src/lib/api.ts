@@ -38,6 +38,17 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
   return data as T;
 }
 
+/** Tells the server the Activity was hidden, shown or closed; `keepalive` lets it outlive the page. */
+export function sendPresence(state: 'hidden' | 'visible' | 'leave') {
+  if (!token) return;
+  void fetch('/api/me/presence', {
+    method: 'POST',
+    keepalive: true,
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ state }),
+  }).catch(() => undefined);
+}
+
 const r = (id: string) => `/readings/${encodeURIComponent(id)}`;
 
 export const api = {

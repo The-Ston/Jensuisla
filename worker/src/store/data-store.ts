@@ -5,6 +5,8 @@ import { decode, encode } from './codec';
 export const CATEGORY_NAME = 'jensuisla-data';
 export const USERS_CHANNEL_NAME = 'jsl-users';
 export const READING_CHANNEL_PREFIX = 'jsl-r-';
+/** Human-readable trace of connections and notifications, for diagnosis. */
+export const LOG_CHANNEL_NAME = 'jsl-log';
 
 export interface Stored<T> {
   value: T;
@@ -63,6 +65,7 @@ export class DataStore {
     private readonly config: StoreConfig,
     private readonly categoryId: string,
     private readonly usersChannelId: string,
+    readonly logChannelId: string,
   ) {}
 
   /** Only the bot can see the data channels. */
@@ -81,7 +84,7 @@ export class DataStore {
 
   static async load(api: DiscordApi, config: StoreConfig): Promise<DataStore> {
     const channels = await api.listGuildChannels(config.guildId);
-    const bootstrap = new DataStore(api, config, '', '');
+    const bootstrap = new DataStore(api, config, '', '', '');
 
     let category = channels.find((c) => c.type === ChannelType.GuildCategory && c.name === CATEGORY_NAME);
     category ??= await api.createGuildChannel(config.guildId, {
@@ -99,7 +102,15 @@ export class DataStore {
       permission_overwrites: bootstrap.overwrites(),
     });
 
-    const store = new DataStore(api, config, category.id, usersChannel.id);
+    let logChannel = children.find((c) => c.name === LOG_CHANNEL_NAME);
+    logChannel ??= await api.createGuildChannel(config.guildId, {
+      name: LOG_CHANNEL_NAME,
+      type: ChannelType.GuildText,
+      parent_id: category.id,
+      permission_overwrites: bootstrap.overwrites(),
+    });
+
+    const store = new DataStore(api, config, category.id, usersChannel.id, logChannel.id);
     const readingChannels = children.filter((c) => c.name?.startsWith(READING_CHANNEL_PREFIX));
     await Promise.all([store.loadUsers(), ...readingChannels.map((c) => store.loadReading(c.id))]);
     return store;

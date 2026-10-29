@@ -14,7 +14,9 @@ import { DataStore } from './store/data-store';
 const MEMBERS_TTL_MS = 5 * 60_000;
 const TOKEN_TTL_MS = 10 * 60_000;
 /** Notifications are batched so a burst of reactions becomes one message. */
-const NOTIFY_DELAY_MS = 2 * 60_000;
+const NOTIFY_DELAY_MS = 60_000;
+const LOG_MAX = 1900;
+const PENDING_PREFIX = 'pending:';
 
 export type Op =
   | { op: 'home' }
@@ -61,7 +63,8 @@ export type OpResult = { ok: true; data: unknown } | { ok: false; status: number
 /**
  * Single instance holding the in-memory copy of all data. Every operation runs in a queue,
  * so concurrent writes (two reactions at once…) never overwrite each other in Discord.
- * Nothing is kept in Durable Object storage: Discord is the only source of truth.
+ * Discord is the only source of truth: Durable Object storage only buffers notifications
+ * waiting to be sent.
  */
 export class JensuislaStore extends DurableObject<Env> {
   private readonly api: DiscordRest;
@@ -72,7 +75,12 @@ export class JensuislaStore extends DurableObject<Env> {
   private emojis: { at: number; map: Map<string, EmojiInfo> } | null = null;
   private tokens = new Map<string, { userId: string; at: number }>();
   private dmChannels = new Map<string, string>();
-  private pending: NotifyEvent[] = [];
+  /** Storage writes of events queued by the current operation, awaited before it answers. */
+  private pendingWrites: Promise<void>[] = [];
+  /** Keeps log messages in the order they were written. */
+  private logging: Promise<void> = Promise.resolve();
+  /** Tells log lines from different instances apart: memory is lost when it changes. */
+  private readonly instance = crypto.randomUUID().slice(0, 4);
   /** Edits being sent to Discord, outside of the request queue. */
   private flushing: Promise<void> | null = null;
 
@@ -81,6 +89,7 @@ export class JensuislaStore extends DurableObject<Env> {
     this.api = new DiscordRest(env.DISCORD_BOT_TOKEN);
     // Once per start: a failure is logged and retried at the next one.
     void ensureLaunchSetup(this.api, env).catch((err) => console.error('launch setup failed', err));
+    this.log([`🟢 Démarrage d’une instance du serveur`]);
   }
 
   private getService(): Promise<Service> {
@@ -165,14 +174,30 @@ export class JensuislaStore extends DurableObject<Env> {
     const user = await fetchOAuthUser(accessToken);
     if (!user) return null;
     this.tokens.set(accessToken, { userId: user.id, at: Date.now() });
+    if (!cached) this.log(this.getMembers().then((m) => [`🔑 Connexion de ${m.get(user.id)?.name ?? user.id}`]));
     return user.id;
+  }
+
+  /** The Activity says when it is hidden, shown again or closed. */
+  async presence(userId: string, state: string): Promise<void> {
+    const what: Record<string, string> = {
+      hidden: '🌙 Activité en arrière-plan',
+      visible: '👀 Activité de nouveau visible',
+      leave: '👋 Déconnexion',
+    };
+    const label = what[state];
+    if (label) this.log(this.getMembers().then((m) => [`${label} : ${m.get(userId)?.name ?? userId}`]));
   }
 
   async run(userId: string, op: Op): Promise<OpResult> {
     return this.exclusive(async () => {
       try {
-        return { ok: true, data: await this.dispatch(await this.getService(), userId, op) };
+        const data = await this.dispatch(await this.getService(), userId, op);
+        await Promise.all(this.pendingWrites.splice(0));
+        return { ok: true, data };
       } catch (err) {
+        // Events already queued still describe saved changes: let their writes finish.
+        void Promise.allSettled(this.pendingWrites.splice(0));
         if (err instanceof HttpError) return { ok: false, status: err.status, error: err.message };
         if (err instanceof RecordTooLargeError)
           return { ok: false, status: 400, error: 'Trop long pour être enregistré : raccourcis le message' };
@@ -279,26 +304,74 @@ export class JensuislaStore extends DurableObject<Env> {
     });
   }
 
+  /**
+   * Posts lines to the hidden log channel (and the Worker logs). Never fails the caller;
+   * lines are sent in order, split to fit Discord's message size.
+   */
+  private log(lines: string[] | Promise<string[]>) {
+    // Taken now: the line may only reach Discord after earlier ones.
+    const at = new Date().toLocaleTimeString('fr-FR', { timeZone: 'Europe/Paris' });
+    const ready = Promise.all([lines, this.getService()]);
+    this.logging = this.logging
+      .then(() => ready)
+      .then(async ([lines]) => {
+        const all = lines.map((line, i) => (i === 0 ? `\`${at}\` \`${this.instance}\` ${line}` : line));
+        for (const line of all) console.log(line);
+        const chunks: string[] = [];
+        for (const line of all) {
+          const last = chunks[chunks.length - 1];
+          if (last !== undefined && last.length + line.length + 1 <= LOG_MAX) chunks[chunks.length - 1] = `${last}\n${line}`;
+          else chunks.push(line.slice(0, LOG_MAX));
+        }
+        for (const content of chunks)
+          await this.api.createMessage(this.store!.logChannelId, { content, allowed_mentions: { parse: [] } });
+      })
+      .catch((err) => console.warn('log failed', err));
+    this.ctx.waitUntil(this.logging);
+  }
+
+  /**
+   * Waiting events live in Durable Object storage, not memory: the object is put to sleep after
+   * a few idle seconds, long before the batch is sent. One key per event, so no read-modify-write.
+   */
   private enqueueNotification(event: NotifyEvent) {
-    this.pending.push(event);
-    void this.ctx.storage.getAlarm().then((alarm) => {
-      if (alarm === null) return this.ctx.storage.setAlarm(Date.now() + NOTIFY_DELAY_MS);
-    });
+    this.pendingWrites.push(
+      (async () => {
+        await this.ctx.storage.put(`${PENDING_PREFIX}${Date.now()}-${crypto.randomUUID()}`, event);
+        if ((await this.ctx.storage.getAlarm()) === null) await this.ctx.storage.setAlarm(Date.now() + NOTIFY_DELAY_MS);
+      })(),
+    );
+    this.log(
+      this.getMembers().then((m) => [
+        `📝 En attente : ${event.kind} de ${m.get(event.actorId)?.name ?? event.actorId} en ${event.position}`,
+      ]),
+    );
   }
 
   async alarm(): Promise<void> {
     await this.exclusive(async () => {
-      const events = this.pending.splice(0);
-      if (events.length === 0 || !this.store) return;
+      const pending = await this.ctx.storage.list<NotifyEvent>({ prefix: PENDING_PREFIX });
+      if (pending.size === 0) {
+        this.log([`⏰ Envoi groupé : aucun événement en attente`]);
+        return;
+      }
+      const events = [...pending.values()];
+      const lines = [`⏰ Envoi groupé de ${events.length} événement(s)`];
+      // The object may just have woken up for this alarm, with nothing loaded yet.
+      await this.getService();
       const members = await this.getMembers();
-      const store = this.store;
+      const store = this.store!;
+      const nameOf = (id: string) => members.get(id)?.name ?? 'Quelqu’un';
       const messages = buildNotifications(
         events,
         store,
-        (id) => members.get(id)?.name ?? 'Quelqu’un',
+        nameOf,
         (id) => store.users.get(id)?.value.notify ?? DEFAULT_NOTIFY,
+        (line) => lines.push(line),
       );
+      if (messages.length === 0) lines.push('Aucun message à envoyer');
       for (const m of messages) {
+        const target = m.kind === 'dm' ? `MP à ${nameOf(m.userId)}` : `#lectures (${m.mentionIds.map(nameOf).join(', ')})`;
         try {
           if (m.kind === 'dm') {
             let channelId = this.dmChannels.get(m.userId);
@@ -318,11 +391,16 @@ export class JensuislaStore extends DurableObject<Env> {
               components: OPEN_BUTTON,
             });
           }
+          lines.push(`✅ ${target} : envoyé`);
         } catch (err) {
           // A user may have closed their DMs: skip them rather than failing the batch.
           console.warn('notification failed', m.kind, err);
+          lines.push(`❌ ${target} : ${err instanceof Error ? err.message : String(err)}`);
         }
       }
+      // Only now: if anything above threw, the alarm is retried with the events still there.
+      await this.ctx.storage.delete([...pending.keys()]);
+      this.log(lines);
     });
   }
 }

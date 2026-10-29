@@ -204,6 +204,11 @@ async function handleApi(request: Request, env: Env, ctx: ExecutionContext, url:
     const q = url.searchParams.get('q')?.trim();
     return json(q ? await searchBooks(q) : []);
   }
+  if (parts[0] === 'me' && parts[1] === 'presence' && method === 'POST') {
+    const { state } = await body<{ state?: string }>(request);
+    await store(env).presence(userId, String(state ?? ''));
+    return json(null);
+  }
   if (parts[0] === 'gifs' && parts[1] === 'favorites') {
     if (method === 'GET') return fromResult(await store(env).run(userId, { op: 'favorites' }));
     if (method === 'POST') {

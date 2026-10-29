@@ -68,6 +68,8 @@ export function buildNotifications(
   store: DataStore,
   nameOf: (userId: string) => string,
   prefOf: (userId: string) => NotifyPref,
+  /** Receives one line per decision taken, for the log channel. */
+  trace: (line: string) => void = () => undefined,
 ): Outgoing[] {
   const out: Outgoing[] = [];
   const byReading = new Map<string, NotifyEvent[]>();
@@ -75,16 +77,31 @@ export function buildNotifications(
 
   for (const [readingId, readingEvents] of byReading) {
     const entry = store.readings.get(readingId);
-    if (!entry) continue;
+    if (!entry) {
+      trace(`Lecture ${readingId} introuvable : ${readingEvents.length} événement(s) ignoré(s)`);
+      continue;
+    }
     const { unit, total, title } = entry.reading;
     const channelLines: string[] = [];
     const mentionIds = new Set<string>();
+    trace(
+      `« ${title} » : ${readingEvents.map((e) => `${e.kind} de ${nameOf(e.actorId)} en ${e.position}`).join(', ')}`,
+    );
 
     for (const { value: p } of entry.participants.values()) {
       const pref = prefOf(p.userId);
-      if (pref === 'none') continue;
+      const who = `${nameOf(p.userId)} (${pref}, en ${p.progress})`;
+      if (pref === 'none') {
+        trace(`  ${who} : notifications désactivées`);
+        continue;
+      }
       const relevant = readingEvents.filter((e) => e.actorId !== p.userId && canSee(e.position, p.progress));
-      if (relevant.length === 0) continue;
+      if (relevant.length === 0) {
+        const own = readingEvents.filter((e) => e.actorId === p.userId).length;
+        trace(`  ${who} : rien (${own} de ses propres actions, ${readingEvents.length - own} pas encore atteinte(s))`);
+        continue;
+      }
+      trace(`  ${who} : ${pref === 'dm' ? 'MP' : 'mention'} pour ${relevant.length} événement(s)`);
       if (pref === 'dm') {
         // Positions and mentions in excerpts are shown in the recipient's own scale.
         const own = readerUnit(entry.reading, p);
