@@ -227,6 +227,21 @@
     highlightTimer = setTimeout(() => (highlightedId = null), 1600);
   }
 
+  /**
+   * Opens a reader's furthest comment among those I can see (the server only sends visible
+   * ones): the closest to where they are, as far as my own reach allows.
+   */
+  function jumpToReader(userId: string) {
+    const latest = view?.comments
+      .filter((c) => c.authorId === userId)
+      .reduce<Comment | undefined>(
+        (best, c) => (!best || c.position > best.position || (c.position === best.position && c.createdAt > best.createdAt) ? c : best),
+        undefined,
+      );
+    if (latest) void jumpTo(latest.id);
+    else showToast(`${view?.members[userId]?.name ?? 'Cette personne'} n’a encore rien écrit que tu peux lire.`);
+  }
+
   function step(delta: number) {
     const target = points[selectedIndex + delta] ?? (delta < 0 && selected !== 'all' && selectedIndex === -1 ? points[points.length - 1] : undefined);
     if (target) select(target.start);
@@ -353,6 +368,7 @@
         {spoilers}
         {selected}
         onSelect={select}
+        onReader={jumpToReader}
       />
     </section>
 

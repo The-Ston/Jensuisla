@@ -16,6 +16,7 @@
     spoilers = false,
     selected,
     onSelect,
+    onReader,
   }: {
     scale: Scale;
     points: TimelinePoint[];
@@ -25,6 +26,8 @@
     spoilers?: boolean;
     selected: number | 'here' | 'all';
     onSelect: (key: number | 'here') => void;
+    /** Another reader's face was clicked. */
+    onReader: (userId: string) => void;
   } = $props();
 
   const LABEL_ROW = 30;
@@ -165,7 +168,8 @@
       {#if g.row > 0}
         <span class="stem low" style:left="{g.anchor}px" style:top="{lineTop + 6}px" style:height="{top - lineTop - 6}px"></span>
       {/if}
-      {#if g.isHere}
+      {@const others = g.readers.filter((r) => !r.isMe)}
+      {#if others.length === 0}
         <button
           class="readers here"
           class:selected={selected === 'here'}
@@ -176,21 +180,53 @@
           aria-pressed={selected === 'here'}
           onclick={() => onSelect('here')}
         >
-          {@render faces(g)}
+          {@render faces(g, false)}
+        </button>
+      {:else if g.readers.length === 1}
+        <button
+          class="readers"
+          style:left="{g.left}px"
+          style:top="{top}px"
+          style:width="{g.size}px"
+          aria-label="Dernier message de {others[0]!.member.name}"
+          title="{others[0]!.member.name} : {scaleLabel(scale, g.progress)}"
+          onclick={() => onReader(others[0]!.member.id)}
+        >
+          {@render faces(g, false)}
         </button>
       {:else}
-        <span class="readers" style:left="{g.left}px" style:top="{top}px" style:width="{g.size}px" title={g.readers.map((r) => r.member.name).join(', ') + ' : ' + scaleLabel(scale, g.progress)}>
-          {@render faces(g)}
+        <!-- Several readers share the spot: each face opens its own reader. -->
+        <span
+          class="readers"
+          class:here={g.isHere}
+          class:selected={g.isHere && selected === 'here'}
+          style:left="{g.left}px"
+          style:top="{top}px"
+          style:width="{g.size}px"
+          title={g.readers.map((r) => r.member.name).join(', ') + ' : ' + scaleLabel(scale, g.progress)}
+        >
+          {@render faces(g, true)}
         </span>
       {/if}
     {/each}
   </div>
 </div>
 
-{#snippet faces(g: (typeof groups)[number])}
+{#snippet faces(g: (typeof groups)[number], clickable: boolean)}
   <span class="faces">
     {#each g.avatars as r (r.member.id)}
-      <Avatar member={r.member} size={24} ring={r.isMe ? 'var(--me)' : 'var(--surface)'} />
+      {#if clickable}
+        <button
+          class="face"
+          aria-label={r.isMe ? `Ma position : ${scaleLabel(scale, g.progress)}` : `Dernier message de ${r.member.name}`}
+          title={r.isMe ? 'Toi' : r.member.name}
+          onclick={() => (r.isMe ? onSelect('here') : onReader(r.member.id))}
+        >
+          <Avatar member={r.member} size={24} ring={r.isMe ? 'var(--me)' : 'var(--surface)'} />
+        </button>
+      {:else}
+        <Avatar member={r.member} size={24} ring={r.isMe ? 'var(--me)' : 'var(--surface)'} />
+      {/if}
     {:else}
       <span class="dot-me"></span>
     {/each}
@@ -282,6 +318,18 @@
   }
   .faces > :global(* + *) {
     margin-left: -10px;
+  }
+  .face {
+    display: flex;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    cursor: pointer;
+  }
+  .face:hover {
+    position: relative;
+    z-index: 1;
   }
   .dot-me {
     width: 14px;
