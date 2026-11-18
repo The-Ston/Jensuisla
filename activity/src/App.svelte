@@ -4,9 +4,10 @@
   import { connect, inDiscord } from './lib/discord';
   import Create from './routes/Create.svelte';
   import Home from './routes/Home.svelte';
+  import Licenses from './routes/Licenses.svelte';
   import Reading from './routes/Reading.svelte';
 
-  type Route = { name: 'home' } | { name: 'create' } | { name: 'reading'; id: string };
+  type Route = { name: 'home' } | { name: 'create' } | { name: 'licenses' } | { name: 'reading'; id: string };
 
   let status = $state<'loading' | 'ready' | 'error'>('loading');
   let error = $state('');
@@ -36,7 +37,13 @@
 {:else if status === 'error'}
   <p class="center error">{error}</p>
 {:else if route.name === 'home'}
-  <Home onOpen={openReading} onCreate={() => (route = { name: 'create' })} />
+  <Home
+    onOpen={openReading}
+    onCreate={() => (route = { name: 'create' })}
+    onLicenses={() => (route = { name: 'licenses' })}
+  />
+{:else if route.name === 'licenses'}
+  <Licenses onBack={goHome} />
 {:else if route.name === 'create'}
   <Create onCancel={goHome} onCreated={openReading} />
 {:else}

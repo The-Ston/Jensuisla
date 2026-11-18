@@ -21,3 +21,16 @@ cloudflared tunnel --url http://localhost:8787
 
 Secrets go in `worker/.dev.vars` locally and `wrangler secret put` in production:
 `DISCORD_BOT_TOKEN`, `DISCORD_CLIENT_SECRET`, `GIPHY_API_KEY` (optional).
+
+## License and credits
+
+Jensuisla is released under the [MIT License](LICENSE).
+
+- Emoji graphics: [Twemoji](https://github.com/jdecked/twemoji), licensed under
+  [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+- GIFs: Powered by [GIPHY](https://giphy.com).
+- Book data and covers: [Open Library](https://openlibrary.org).
+- Fonts: IBM Plex Sans and Literata, under the SIL Open Font License 1.1.
+
+The build writes `licenses.txt` next to the Activity with the license of every bundled package
+(`activity/licenses-plugin.ts`); the Activity links to it from its home screen footer.

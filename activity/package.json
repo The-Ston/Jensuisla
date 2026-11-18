@@ -1,6 +1,7 @@
 {
   "name": "jensuisla-activity",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite build --watch --mode development",

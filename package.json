@@ -1,6 +1,7 @@
 {
   "name": "jensuisla",
   "private": true,
+  "license": "MIT",
   "description": "Shared reading Discord Activity with progress-gated discussions",
   "workspaces": [
     "activity",

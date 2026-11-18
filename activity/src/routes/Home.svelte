@@ -4,11 +4,16 @@
   import AppearanceSettings from '../components/AppearanceSettings.svelte';
   import Avatar from '../components/Avatar.svelte';
   import CommentColorPicker from '../components/CommentColorPicker.svelte';
+  import Credits from '../components/Credits.svelte';
   import { api } from '../lib/api';
   import { applyAppearance } from '../lib/appearance';
   import { progressText } from '../lib/format';
 
-  let { onOpen, onCreate }: { onOpen: (id: string) => void; onCreate: () => void } = $props();
+  let {
+    onOpen,
+    onCreate,
+    onLicenses,
+  }: { onOpen: (id: string) => void; onCreate: () => void; onLicenses: () => void } = $props();
 
   let home = $state<HomeView | null>(null);
   let error = $state('');
@@ -185,6 +190,8 @@
         </div>
       </div>
     </section>
+
+    <Credits {onLicenses} />
   {:else if error}
     <p class="error">{error}</p>
     <button class="btn" onclick={load}>Réessayer</button>
