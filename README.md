@@ -22,6 +22,12 @@ cloudflared tunnel --url http://localhost:8787
 Secrets go in `worker/.dev.vars` locally and `wrangler secret put` in production:
 `DISCORD_BOT_TOKEN`, `DISCORD_CLIENT_SECRET`, `GIPHY_API_KEY` (optional).
 
+## Brand
+
+`brand/` holds the app icon and the Activity cover: SVG sources and the PNG exports uploaded to
+the Discord Developer Portal (icon 1024×1024, cover 1920×1080). `activity/public/favicon.svg` is a
+copy of the icon.
+
 ## License and credits
 
 Jensuisla is released under the [MIT License](LICENSE).

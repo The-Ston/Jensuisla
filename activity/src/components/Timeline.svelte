@@ -36,6 +36,8 @@
   const LABEL_ROWS = 3;
   const READER_ROWS = 2;
   const MAX_WIDTH = 2400;
+  /** How far my bookmark's tip reaches under the line. */
+  const RIBBON_BOTTOM = 44;
 
   let width = $state(0);
 
@@ -66,18 +68,22 @@
   /**
    * Places boxes centered on their position, kept inside the line's width, each in the first row
    * where it fits. Past `rows` rows (when the line can't grow wider), a new row is added rather
-   * than letting boxes overlap.
+   * than letting boxes overlap. A `pinned` box is placed first so it always gets the first row.
    */
-  function stack<T extends { position: number; size: number }>(items: T[]) {
-    const rowEnds: number[] = [];
-    return items.map((item) => {
+  function stack<T extends { position: number; size: number }>(items: T[], pinned?: (item: T) => boolean) {
+    const placed: { start: number; end: number }[][] = [];
+    const place = (item: T) => {
       const anchor = x(item.position);
       const left = Math.max(0, Math.min(anchor - item.size / 2, width - item.size));
-      let row = rowEnds.findIndex((end) => end + GAP <= left);
-      if (row === -1) row = rowEnds.length;
-      rowEnds[row] = left + item.size;
+      const end = left + item.size;
+      let row = placed.findIndex((spans) => spans.every((s) => s.end + GAP <= left || end + GAP <= s.start));
+      if (row === -1) row = placed.push([]) - 1;
+      placed[row]!.push({ start: left, end });
       return { ...item, anchor, left, row };
-    });
+    };
+    const first = pinned ? items.find(pinned) : undefined;
+    const firstPlaced = first ? place(first) : undefined;
+    return items.map((item) => (item === first ? firstPlaced! : place(item)));
   }
 
   const labelItems = $derived(
@@ -105,8 +111,11 @@
         return { progress, readers: sorted, avatars, isHere, text, position: progress, size: Math.max(24 + (avatars.length - 1) * 14, Math.min(text.length * 6.5, 120)) + 8 };
       });
   });
-  const groups = $derived(stack(groupItems));
+  // My bookmark hangs from the line, so my group always takes the row right under it.
+  const groups = $derived(stack(groupItems, (g) => g.isHere));
   const readerRows = $derived(Math.max(1, ...groups.map((g) => g.row + 1)));
+  const here = $derived(groups.find((g) => g.isHere));
+  const hereOthers = $derived(here?.readers.filter((r) => !r.isMe) ?? []);
 
   // Chapter readings get one graduation per chapter, numbered under the line when there's room.
   const chapters = $derived(scale.unit === 'chapter' ? scale.total : 0);
@@ -119,15 +128,27 @@
 
   const lineTop = $derived(labelRows * LABEL_ROW + 14);
   const readersTop = $derived(lineTop + 10 + tickSpace);
+  // The bookmark reaches lower than a face: under it come the faces sharing my spot, then names.
+  const hereNamesTop = $derived(lineTop + RIBBON_BOTTOM + (hereOthers.length ? 34 : 2));
+  const height = $derived(Math.max(readersTop + readerRows * READER_ROW, hereNamesTop + 18));
   const label = (p: TimelinePoint) => rangeLabel(scale, p.start, p.end);
+
+  // Opens on my bookmark when the line is wider than the screen; later the reader scrolls freely.
+  let scroller: HTMLDivElement;
+  let centered = false;
+  $effect(() => {
+    if (centered || !here || !width) return;
+    centered = true;
+    scroller.scrollLeft = here.anchor - scroller.clientWidth / 2;
+  });
 </script>
 
-<div class="scroller">
+<div class="scroller" bind:this={scroller}>
   <div
     class="timeline"
     bind:clientWidth={width}
     style:min-width="{minWidth}px"
-    style:height="{readersTop + readerRows * READER_ROW}px"
+    style:height="{height}px"
   >
     {#each labels as l (l.point.start)}
       {@const top = l.row * LABEL_ROW}
@@ -163,26 +184,43 @@
       {/if}
     {/each}
 
-    {#each groups as g (g.progress)}
+    {#if here}
+      {@const me = here.readers.find((r) => r.isMe)}
+      <!-- My position: a bookmark slipped behind the line, my picture inside. -->
+      <button
+        class="bookmark"
+        class:selected={selected === 'here'}
+        style:left="{here.anchor}px"
+        style:top="{lineTop - 6}px"
+        aria-label="Ma position : {scaleLabel(scale, here.progress)}"
+        aria-pressed={selected === 'here'}
+        title="Toi : {scaleLabel(scale, here.progress)}"
+        onclick={() => onSelect('here')}
+      >
+        <span class="tuck"></span>
+        <span class="ribbon">{#if me}<Avatar member={me.member} size={24} />{/if}</span>
+      </button>
+      <span class="readers here" style:left="{here.left}px" style:top="{hereNamesTop - (hereOthers.length ? 28 : 0)}px" style:width="{here.size}px">
+        {#if hereOthers.length}
+          <span class="faces">
+            {#each hereOthers.slice(0, 3) as r (r.member.id)}
+              <button class="face" aria-label="Dernier message de {r.member.name}" title={r.member.name} onclick={() => onReader(r.member.id)}>
+                <Avatar member={r.member} size={24} ring="var(--surface)" />
+              </button>
+            {/each}
+          </span>
+        {/if}
+        <span class="names">{here.text}</span>
+      </span>
+    {/if}
+
+    {#each groups.filter((g) => !g.isHere) as g (g.progress)}
       {@const top = readersTop + g.row * READER_ROW}
       {#if g.row > 0}
         <span class="stem low" style:left="{g.anchor}px" style:top="{lineTop + 6}px" style:height="{top - lineTop - 6}px"></span>
       {/if}
       {@const others = g.readers.filter((r) => !r.isMe)}
-      {#if others.length === 0}
-        <button
-          class="readers here"
-          class:selected={selected === 'here'}
-          style:left="{g.left}px"
-          style:top="{top}px"
-          style:width="{g.size}px"
-          aria-label="Ma position : {scaleLabel(scale, g.progress)}"
-          aria-pressed={selected === 'here'}
-          onclick={() => onSelect('here')}
-        >
-          {@render faces(g, false)}
-        </button>
-      {:else if g.readers.length === 1}
+      {#if g.readers.length === 1}
         <button
           class="readers"
           style:left="{g.left}px"
@@ -198,8 +236,6 @@
         <!-- Several readers share the spot: each face opens its own reader. -->
         <span
           class="readers"
-          class:here={g.isHere}
-          class:selected={g.isHere && selected === 'here'}
           style:left="{g.left}px"
           style:top="{top}px"
           style:width="{g.size}px"
@@ -213,22 +249,21 @@
 </div>
 
 {#snippet faces(g: (typeof groups)[number], clickable: boolean)}
+  <!-- Other readers only: my own position is the bookmark. -->
   <span class="faces">
     {#each g.avatars as r (r.member.id)}
       {#if clickable}
         <button
           class="face"
-          aria-label={r.isMe ? `Ma position : ${scaleLabel(scale, g.progress)}` : `Dernier message de ${r.member.name}`}
-          title={r.isMe ? 'Toi' : r.member.name}
-          onclick={() => (r.isMe ? onSelect('here') : onReader(r.member.id))}
+          aria-label="Dernier message de {r.member.name}"
+          title={r.member.name}
+          onclick={() => onReader(r.member.id)}
         >
-          <Avatar member={r.member} size={24} ring={r.isMe ? 'var(--me)' : 'var(--surface)'} />
+          <Avatar member={r.member} size={24} ring="var(--surface)" />
         </button>
       {:else}
-        <Avatar member={r.member} size={24} ring={r.isMe ? 'var(--me)' : 'var(--surface)'} />
+        <Avatar member={r.member} size={24} ring="var(--surface)" />
       {/if}
-    {:else}
-      <span class="dot-me"></span>
     {/each}
   </span>
   <span class="names">{g.text}</span>
@@ -331,13 +366,6 @@
     position: relative;
     z-index: 1;
   }
-  .dot-me {
-    width: 14px;
-    height: 14px;
-    margin: 5px;
-    border-radius: 50%;
-    background: var(--me);
-  }
   .names {
     max-width: 100%;
     font-size: 11px;
@@ -346,8 +374,46 @@
     text-overflow: ellipsis;
   }
   .here .names {
-    color: var(--me);
+    color: var(--accent);
     font-weight: 700;
+  }
+  /* My bookmark: tucked behind the line, hanging below it with my picture inside. */
+  .bookmark {
+    position: absolute;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0;
+    border: 0;
+    background: none;
+    transform: translateX(-50%);
+    cursor: pointer;
+  }
+  .tuck {
+    width: 30px;
+    height: 6px;
+    margin-bottom: -2px;
+    background: color-mix(in srgb, #000 35%, var(--accent));
+    clip-path: polygon(12% 0, 88% 0, 100% 100%, 0 100%);
+  }
+  .ribbon {
+    width: 30px;
+    height: 46px;
+    padding-top: 4px;
+    display: flex;
+    justify-content: center;
+    background: var(--accent);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 80%, 0 100%);
+  }
+  .ribbon :global(.avatar) {
+    outline: 2px solid color-mix(in srgb, #000 18%, var(--accent));
+  }
+  .bookmark:hover .ribbon {
+    filter: brightness(1.12);
+  }
+  .bookmark.selected {
+    filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.5));
   }
   .label.spoiler {
     background: var(--surface);
@@ -375,10 +441,6 @@
     background: var(--text);
     color: var(--bg);
     box-shadow: 0 0 0 3px var(--accent-ring);
-  }
-  .here.selected {
-    background: var(--me-soft);
-    box-shadow: 0 0 0 2px var(--me-ring);
   }
   .new {
     position: absolute;

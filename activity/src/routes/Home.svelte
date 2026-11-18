@@ -5,6 +5,7 @@
   import Avatar from '../components/Avatar.svelte';
   import CommentColorPicker from '../components/CommentColorPicker.svelte';
   import Credits from '../components/Credits.svelte';
+  import Shelf from '../components/Shelf.svelte';
   import { api } from '../lib/api';
   import { applyAppearance } from '../lib/appearance';
   import { progressText } from '../lib/format';
@@ -90,6 +91,7 @@
 <main>
   {#if home}
     <header>
+      <Shelf />
       <div class="hello">
         <Avatar member={home.me} size={40} />
         <div>
@@ -209,12 +211,26 @@
     flex-direction: column;
     gap: 28px;
   }
+  /* The shelf drawing sits behind the greeting, flush with the screen edges. */
   header {
+    position: relative;
+    overflow: hidden;
+    margin: -24px -16px 0;
+    padding: 28px 16px 22px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 16px;
     flex-wrap: wrap;
+  }
+  header > :global(:not(svg)) {
+    position: relative;
+  }
+  /* Phones: room for the shelf under the greeting and button (see Shelf). */
+  @media (max-width: 600px) {
+    header {
+      padding-bottom: 72px;
+    }
   }
   .hello {
     display: flex;

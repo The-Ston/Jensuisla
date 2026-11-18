@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360">
+  <!-- Jensuisla Activity cover (16:9): name and tagline over a bookshelf, one book facing out with its ribbon. Fonts: Literata 700 and 500 italic. -->
+  <defs><radialGradient id="glow" cx=".8" cy=".95" r=".7"><stop offset="0" stop-color="#e8a33d" stop-opacity=".16"/><stop offset="1" stop-color="#e8a33d" stop-opacity="0"/></radialGradient></defs>
+  <rect width="640" height="360" fill="#16171b"/>
+  <rect width="640" height="360" fill="url(#glow)"/>
+  <text x="46" y="108" font-family="Literata, Georgia, serif" font-weight="700" font-size="60" fill="#e9e7e2">Jensuisla</text>
+  <text x="50" y="144" font-family="Literata, Georgia, serif" font-style="italic" font-weight="500" font-size="20" fill="#a3a6ae">Lire ensemble, sans spoiler.</text>
+  <g>
+    <rect x="300.0" y="202.4" width="22.0" height="127.6" rx="1.5" fill="none" stroke="#5a5d66" stroke-width="1.2"/>
+    <rect x="328.6" y="171.6" width="37.4" height="158.4" rx="1.5" fill="none" stroke="#5a5d66" stroke-width="1.2"/>
+    <line x1="330.6" y1="206.4" x2="364.0" y2="206.4" stroke="#5a5d66" stroke-width="1"/>
+    <rect x="372.6" y="220.0" width="33.0" height="110.0" rx="1.5" fill="none" stroke="#5a5d66" stroke-width="1.2"/>
+    <rect x="412.2" y="184.8" width="28.6" height="145.2" rx="1.5" fill="none" stroke="#5a5d66" stroke-width="1.2"/>
+    <rect x="447.4" y="154.0" width="24.2" height="176.0" rx="1.5" fill="none" stroke="#5a5d66" stroke-width="1.2"/>
+    <line x1="449.4" y1="192.7" x2="469.6" y2="192.7" stroke="#5a5d66" stroke-width="1"/>
+    <rect x="478.2" y="211.2" width="88.0" height="118.8" rx="6.6" fill="none" stroke="#e8a33d" stroke-width="1.4"/>
+    <line x1="491.4" y1="211.2" x2="491.4" y2="330" stroke="#e8a33d" stroke-width="1.2"/>
+    <line x1="504.6" y1="287.2" x2="553.0" y2="287.2" stroke="#e8a33d" stroke-width="1.6" stroke-linecap="round" opacity=".6"/>
+    <path d="M524.0 193.6h17.6v93.6l-8.8 -8.8l-8.8 8.8z" fill="#e8a33d"/>
+    <rect x="577.2" y="176.0" width="35.2" height="154.0" rx="1.5" fill="none" stroke="#5a5d66" stroke-width="1.2"/>
+    <rect x="619.0" y="193.6" width="30.8" height="136.4" rx="1.5" fill="none" stroke="#5a5d66" stroke-width="1.2"/>
+    <line x1="621.0" y1="223.6" x2="647.8" y2="223.6" stroke="#5a5d66" stroke-width="1"/>
+    <rect x="656.4" y="162.8" width="26.4" height="167.2" rx="1.5" fill="none" stroke="#5a5d66" stroke-width="1.2"/>
+  </g>
+  <line x1="0" y1="331" x2="640" y2="331" stroke="#3a3d46" stroke-width="3"/>
+</svg>

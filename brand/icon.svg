@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Jensuisla icon: a closed book whose ribbon lands on the cover's timeline, read up to it. -->
+  <rect width="100" height="100" fill="#16171b"/>
+  <rect x="20" y="16" width="60" height="70" rx="6" fill="#e9e7e2"/>
+  <rect x="20" y="16" width="10" height="70" rx="4" fill="#a3a6ae"/>
+  <line x1="37" y1="64" x2="73" y2="64" stroke="#c9c6bf" stroke-width="5" stroke-linecap="round"/>
+  <line x1="37" y1="64" x2="58" y2="64" stroke="#16171b" stroke-width="5" stroke-linecap="round"/>
+  <path d="M51 8h16v58l-8-7-8 7z" fill="#e8a33d"/>
+</svg>
