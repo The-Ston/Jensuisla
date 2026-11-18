@@ -1,0 +1,69 @@
+<!doctype html>
+<meta charset="utf-8">
+<style>
+@font-face { font-family: Literata; font-weight: 700; src: url(../node_modules/@fontsource/literata/files/literata-latin-700-normal.woff2); }
+@font-face { font-family: Literata; font-style: italic; font-weight: 500; src: url(../node_modules/@fontsource/literata/files/literata-latin-500-italic.woff2); }
+@font-face { font-family: Plex; font-weight: 700; src: url(../node_modules/@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-600-normal.woff2); }
+html, body { margin: 0; background: #16171b; }
+svg { display: block; width: 640px; height: 360px; }
+</style>
+<svg id="s" viewBox="0 0 640 360"></svg>
+<script>
+// One frame of the Activity preview, at time t (seconds) from ?t=. Scene: shelf rises, the facing
+// book and its ribbon appear, a timeline fills up to the reader's bookmark, then the title.
+const t = +new URLSearchParams(location.search).get('t') || 0;
+const clamp = (v) => Math.max(0, Math.min(1, v));
+const ease = (v) => 1 - Math.pow(1 - clamp(v), 3);
+const p = (a, b) => ease((t - a) / (b - a));
+const ACC = '#e8a33d', LINE = '#5a5d66', TEXT = '#e9e7e2', MUTED = '#a3a6ae', BG = '#16171b';
+const parts = [];
+const add = (s) => parts.push(s);
+
+add(`<defs><radialGradient id="g" cx=".8" cy="1" r=".7"><stop offset="0" stop-color="${ACC}" stop-opacity="${0.18 * p(0, 2)}"/><stop offset="1" stop-color="${ACC}" stop-opacity="0"/></radialGradient></defs>`);
+add(`<rect width="640" height="360" fill="${BG}"/><rect width="640" height="360" fill="url(#g)"/>`);
+
+// Shelf on the right: spines rise from the plank one after another.
+const hs = [58, 72, 50, 66, 80, 54, 70, 62, 76, 48, 68, 60, 74, 56];
+const s = 2, base = 330;
+let x = 300, k = 0;
+const plank = p(0, 0.8);
+add(`<line x1="${640 - 340 * plank}" y1="${base + 1}" x2="640" y2="${base + 1}" stroke="#3a3d46" stroke-width="3"/>`);
+while (x < 660) {
+  const d = 0.15 + k * 0.08;
+  if (k === 5) {
+    const w = 40 * s, h = 54 * s, q = p(1.4, 2.4), y = base - h * q;
+    add(`<g opacity="${q}"><rect x="${x}" y="${y}" width="${w}" height="${h * q}" rx="${3 * s}" fill="${BG}" stroke="${ACC}" stroke-width="1.6"/><line x1="${x + 6 * s}" y1="${y}" x2="${x + 6 * s}" y2="${base}" stroke="${ACC}" stroke-width="1.3"/></g>`);
+    const r = p(2.2, 3), rx = x + w * 0.62, top = base - h - 8 * s, len = (h * 0.64 + 8 * s) * r;
+    if (r > 0) add(`<path d="M${rx - 4 * s} ${top}h${8 * s}v${len}l${-4 * s} ${-4 * s}l${-4 * s} ${4 * s}z" fill="${ACC}"/>`);
+    x += w + 5 * s; k++; continue;
+  }
+  const w = (10 + (k * 7) % 9) * s, hh = hs[k % hs.length] * s * p(d, d + 0.6);
+  if (hh > 0.5) add(`<rect x="${x}" y="${base - hh}" width="${w}" height="${hh}" rx="1.5" fill="none" stroke="${LINE}" stroke-width="1.3"/>`);
+  x += w + 3 * s; k++;
+}
+
+// Timeline on the left: ticks, comment points lighting up as the fill passes them, the bookmark.
+const tlx = 40, tlw = 230, tly = 250, me = 0.62, fill = p(3, 5.6) * me;
+const tl = p(2.6, 3.2);
+add(`<g opacity="${tl}"><rect x="${tlx}" y="${tly - 2}" width="${tlw}" height="4" rx="2" fill="#2a2c33"/>`);
+add(`<rect x="${tlx}" y="${tly - 2}" width="${tlw * fill}" height="4" rx="2" fill="${ACC}"/>`);
+for (let i = 0; i <= 12; i++) { const tx = tlx + (tlw * i) / 12; add(`<rect x="${tx - 1}" y="${tly - 7}" width="2" height="14" rx="1" fill="${i / 12 <= fill ? ACC : '#3a3d46'}"/>`); }
+for (const [pos, n] of [[0.15, 3], [0.38, 1], [0.55, 2], [0.85, 2]]) {
+  const px = tlx + tlw * pos, lit = pos <= fill, future = pos > me;
+  add(`<line x1="${px}" y1="${tly - 30}" x2="${px}" y2="${tly - 8}" stroke="${future ? '#f08c7a' : lit ? ACC : '#3a3d46'}" stroke-width="1.5" opacity="${future ? 0.5 : 1}"/>`);
+  add(future
+    ? `<rect x="${px - 13}" y="${tly - 52}" width="26" height="22" rx="11" fill="${BG}" stroke="#f08c7a" stroke-width="1.5" stroke-dasharray="3 2"/><text x="${px}" y="${tly - 37}" text-anchor="middle" font-family="Plex, sans-serif" font-weight="700" font-size="12" fill="#f08c7a">?</text>`
+    : `<rect x="${px - 13}" y="${tly - 52}" width="26" height="22" rx="11" fill="${lit ? ACC : '#2a2c33'}"/><text x="${px}" y="${tly - 37}" text-anchor="middle" font-family="Plex, sans-serif" font-weight="700" font-size="12" fill="${lit ? BG : MUTED}">${n}</text>`);
+}
+const bx = tlx + tlw * fill;
+add(`<path d="M${bx - 15} ${tly - 6}h30l3 6h-36z" fill="#9a6a24"/><path d="M${bx - 15} ${tly - 2}h30v44l-15 -9l-15 9z" fill="${ACC}"/>`);
+add(`<circle cx="${bx}" cy="${tly + 13}" r="11" fill="#6aa9ff" stroke="#b87f2a" stroke-width="2"/><text x="${bx}" y="${tly + 17.5}" text-anchor="middle" font-family="Plex, sans-serif" font-weight="700" font-size="12" fill="${BG}">N</text>`);
+add(`<text x="${bx}" y="${tly + 56}" text-anchor="middle" font-family="Plex, sans-serif" font-weight="700" font-size="12" fill="${ACC}">Toi</text></g>`);
+
+// Title last.
+const ti = p(5.8, 6.8);
+add(`<g opacity="${ti}" transform="translate(0 ${8 * (1 - ti)})"><text x="40" y="92" font-family="Literata, Georgia, serif" font-weight="700" font-size="54" fill="${TEXT}">Jensuisla</text>`);
+add(`<text x="43" y="126" font-family="Literata, Georgia, serif" font-style="italic" font-weight="500" font-size="18" fill="${MUTED}">Lire ensemble, sans spoiler.</text></g>`);
+
+document.getElementById('s').innerHTML = parts.join('');
+</script>

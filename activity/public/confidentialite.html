@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Confidentialité · Jensuisla</title>
+    <style>
+      :root {
+        --bg: #16171b;
+        --surface: #1f2127;
+        --border: #2a2c33;
+        --text: #e9e7e2;
+        --muted: #a3a6ae;
+        --accent: #e8a33d;
+        color-scheme: dark;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 16px/1.6 system-ui, -apple-system, 'Segoe UI', sans-serif;
+      }
+      main {
+        max-width: 68ch;
+        margin: 0 auto;
+        padding: 40px 16px 64px;
+      }
+      h1,
+      h2 {
+        font-family: Literata, Georgia, serif;
+        line-height: 1.25;
+      }
+      h1 {
+        font-size: 30px;
+        margin: 0 0 4px;
+      }
+      h2 {
+        font-size: 20px;
+        margin: 36px 0 8px;
+      }
+      p,
+      li {
+        color: var(--text);
+      }
+      ul {
+        padding-left: 20px;
+      }
+      li + li {
+        margin-top: 6px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      a {
+        color: var(--accent);
+      }
+      .note {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 12px 16px;
+      }
+      footer {
+        margin-top: 48px;
+        padding-top: 16px;
+        border-top: 1px solid var(--border);
+        font-size: 14px;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Confidentialité</h1>
+      <p class="muted">Jensuisla · mise à jour le 18 novembre 2026</p>
+
+      <p>
+        Jensuisla est une Activity Discord pour lire un livre à plusieurs sans se spoiler. Cette page explique quelles données
+        l’app utilise, où elles sont gardées et qui peut les voir. Jensuisla est un projet personnel de The-Ston, gratuit et
+        sans publicité ; aucune donnée n’est vendue ni utilisée à d’autres fins que le fonctionnement de l’app.
+      </p>
+
+      <h2>Ce que Jensuisla récupère de ton compte Discord</h2>
+      <ul>
+        <li>
+          À l’ouverture, l’app demande seulement l’autorisation <strong>identify</strong> : elle s’en sert pour connaître ton
+          identifiant Discord, rien d’autre.
+        </li>
+        <li>
+          Pour afficher les lecteurs, le bot lit la liste des membres du serveur : identifiant, pseudo sur le serveur ou nom
+          d’affichage, avatar, et si tu as le rôle d’organisateur. Ces informations sont gardées en mémoire quelques minutes
+          et jamais copiées ailleurs.
+        </li>
+      </ul>
+
+      <h2>Ce que Jensuisla enregistre</h2>
+      <p>
+        Il n’y a pas de base de données : tout est enregistré sous forme de messages du bot dans des salons cachés du serveur
+        Discord où l’app est installée (catégorie <code>jensuisla-data</code>).
+      </p>
+      <ul>
+        <li>
+          <strong>Ta progression</strong> dans chaque lecture : position, unité (chapitre, page ou %), nombre de pages de ton
+          édition, les 10 dernières valeurs (pour « annuler »), ta dernière visite et tes réglages de lecture (voir les spoilers,
+          avancer en commentant).
+        </li>
+        <li>
+          <strong>Ce que tu publies</strong> : commentaires (1 000 caractères au plus), réponses, réactions, GIFs choisis et
+          photos.
+        </li>
+        <li>
+          <strong>Tes préférences</strong> : notifications, thème et couleur d’accent, couleur de tes commentaires, GIFs favoris.
+        </li>
+        <li>
+          <strong>Les photos</strong> sont envoyées en qualité d’origine (4 par message, 10 Mo chacune) et gardées comme pièces
+          jointes Discord.
+          <span class="note" style="display: block; margin-top: 8px">
+            Les métadonnées des photos (par exemple la position GPS ajoutée par certains téléphones) ne sont pas effacées.
+            Retire-les avant l’envoi si tu ne veux pas les partager.
+          </span>
+        </li>
+        <li>
+          Sur ton appareil, l’app garde seulement ton thème et tes émojis récents dans le stockage du navigateur. Pas de cookie.
+        </li>
+      </ul>
+      <p>
+        Ces données sont conservées tant qu’elles existent sur le serveur Discord : il n’y a pas d’effacement automatique. Les
+        notifications en attente sont gardées environ une minute, le temps d’être envoyées, puis supprimées.
+      </p>
+
+      <h2>Qui peut voir quoi</h2>
+      <ul>
+        <li>
+          Les commentaires, réactions, GIFs et photos ne sont visibles que des participants d’une lecture, et seulement s’ils ont
+          atteint le passage concerné (ou s’ils ont choisi de voir les spoilers).
+        </li>
+        <li>
+          Les participants voient la progression de chacun, ainsi que les noms, avatars et couleurs de ceux qui commentent ou
+          réagissent.
+        </li>
+        <li>
+          Les photos sont servies par des liens signés, valables quelques heures et donnés uniquement aux lecteurs qui ont le droit
+          de les voir.
+        </li>
+        <li>
+          L’organisateur d’une lecture peut supprimer n’importe quel commentaire de cette lecture.
+        </li>
+        <li>
+          Les salons cachés ne sont visibles que du bot, mais Discord permet toujours au propriétaire du serveur et aux
+          administrateurs d’ouvrir les salons cachés.
+        </li>
+      </ul>
+
+      <h2>Notifications</h2>
+      <p>
+        Selon ton choix, quand quelqu’un écrit ou réagit dans un passage que tu as déjà lu, tu reçois un message privé du bot
+        (avec le titre du livre, qui, où, et pour un commentaire ses 120 premiers caractères) ou une mention dans le salon de
+        lecture (sans extrait), ou rien du tout.
+      </p>
+
+      <h2>Services tiers</h2>
+      <ul>
+        <li><strong>Discord</strong> : connexion, membres, stockage des données et envoi des notifications.</li>
+        <li>
+          <strong>Cloudflare</strong> héberge l’app (Workers). Ses journaux techniques gardent les requêtes reçues, dont les mots
+          tapés dans les recherches de livres et de GIFs. Les images affichées sont mises en cache par Cloudflare jusqu’à un jour
+          (une photo supprimée peut donc rester accessible par un ancien lien jusque-là).
+        </li>
+        <li>
+          <strong>GIPHY</strong> et <strong>Open Library</strong> reçoivent les mots de tes recherches de GIFs et de livres,
+          envoyés par le serveur de l’app : ton identité ne leur est pas transmise.
+        </li>
+        <li>
+          Les images externes (avatars, GIFs, couvertures, émojis) passent par le serveur de l’app : ton appareil ne contacte pas
+          ces sites directement.
+        </li>
+      </ul>
+
+      <h2>Modifier ou supprimer tes données</h2>
+      <ul>
+        <li>Tu peux modifier ou supprimer tes commentaires et leurs photos, et changer tes préférences à tout moment dans l’app.</li>
+        <li>
+          L’app ne permet pas encore de quitter une lecture ni d’effacer ta progression ou tes préférences toi-même. Pour le
+          demander, contacte un administrateur du serveur ou ouvre un ticket sur
+          <a href="https://github.com/The-Ston/Jensuisla/issues">GitHub</a> (sans y écrire d’information personnelle).
+        </li>
+      </ul>
+
+      <h2>Contact</h2>
+      <p>
+        Pour toute question sur cette page : <a href="https://github.com/The-Ston/Jensuisla/issues">github.com/The-Ston/Jensuisla/issues</a>.
+        Le code de l’app est public et peut être vérifié.
+      </p>
+
+      <footer><a href="/conditions">Conditions d’utilisation</a> · Jensuisla, un projet de The-Ston</footer>
+    </main>
+  </body>
+</html>

@@ -1,9 +1,11 @@
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
+import { buildDefines } from './build-info.ts';
 
 export default defineConfig({
   plugins: [svelte()],
+  define: buildDefines(),
   resolve: {
     alias: { $shared: fileURLToPath(new URL('../worker/src', import.meta.url)) },
     // Use Svelte's browser build in tests (mount() is browser-only).

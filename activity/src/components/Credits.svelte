@@ -22,6 +22,7 @@
     Emojis <a href={TWEMOJI_URL} onclick={(e) => external(e, TWEMOJI_URL)}>Twemoji</a> (CC-BY 4.0) · GIFs Powered by
     GIPHY · <button class="link" onclick={onLicenses}>Licences</button>
   </p>
+  <p class="version">v{__APP_VERSION__} · {__APP_COMMIT__}</p>
 </footer>
 
 <style>
@@ -44,6 +45,11 @@
   }
   .who b {
     font-family: var(--font-display);
+  }
+  .version {
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.7;
   }
   a,
   .link {

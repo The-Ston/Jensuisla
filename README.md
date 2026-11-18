@@ -22,10 +22,24 @@ cloudflared tunnel --url http://localhost:8787
 Secrets go in `worker/.dev.vars` locally and `wrangler secret put` in production:
 `DISCORD_BOT_TOKEN`, `DISCORD_CLIENT_SECRET`, `GIPHY_API_KEY` (optional).
 
+## Releases and deploys
+
+The version lives in the root `package.json` and is shown in the app footer with the commit it was
+built from. Changes are listed in [CHANGELOG.md](CHANGELOG.md):
+
+1. Add entries under "Unreleased" in `CHANGELOG.md` as you go.
+2. `bash scripts/release.sh patch|minor|major` bumps the version, dates the changelog, commits,
+   tags `vX.Y.Z`, pushes and publishes the GitHub release.
+3. `bash scripts/deploy.sh` deploys committed code only; the Cloudflare version is tagged `vX.Y.Z`
+   (or `vX.Y.Z-<commit>` between releases) with the commit message, so any deploy can be traced
+   and rolled back from the Cloudflare dashboard.
+
 ## Brand
 
 `brand/` holds the app icon and the Activity cover: SVG sources and the PNG exports uploaded to
-the Discord Developer Portal (icon 1024×1024, cover 1920×1080). `activity/public/favicon.svg` is a
+the Discord Developer Portal (icon 1024×1024, Activity cover and background 1920×1080, bot profile banner 1360×480,
+Activity video preview 640×360). The video is rendered from `activity-preview.html` (one frame per
+`?t=` second, e.g. with a headless browser) and encoded with ffmpeg. `activity/public/favicon.svg` is a
 copy of the icon.
 
 ## License and credits

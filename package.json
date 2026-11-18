@@ -2,6 +2,7 @@
   "name": "jensuisla",
   "private": true,
   "license": "MIT",
+  "version": "1.0.0",
   "description": "Shared reading Discord Activity with progress-gated discussions",
   "workspaces": [
     "activity",

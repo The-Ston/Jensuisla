@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360">
+  <!-- Jensuisla Activity background (16:9): art kept to the edges, centre left empty for Discord UI. -->
+  <defs>
+    <radialGradient id="gl" cx="0" cy="1" r=".55"><stop offset="0" stop-color="#e8a33d" stop-opacity=".12"/><stop offset="1" stop-color="#e8a33d" stop-opacity="0"/></radialGradient>
+    <radialGradient id="gr" cx="1" cy="1" r=".55"><stop offset="0" stop-color="#e8a33d" stop-opacity=".16"/><stop offset="1" stop-color="#e8a33d" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="640" height="360" fill="#16171b"/>
+  <rect width="640" height="360" fill="url(#gl)"/>
+  <rect width="640" height="360" fill="url(#gr)"/>
+  <path d="M31 0h14v92l-7 -7l-7 7z" fill="#e8a33d" opacity="0.85"/>
+  <path d="M55 0h14v58l-7 -7l-7 7z" fill="#5a5d66" opacity="0.8"/>
+  <path d="M571 0h14v70l-7 -7l-7 7z" fill="#5a5d66" opacity="0.8"/>
+  <path d="M597 0h14v112l-7 -7l-7 7z" fill="#e8a33d" opacity="0.85"/>
+  <g>
+    <rect x="-6.0" y="261.5" width="16.3" height="82.5" rx="1.5" fill="none" stroke="#4a4d56" stroke-width="1.2"/>
+    <rect x="14.0" y="244.0" width="13.8" height="100.0" rx="1.5" fill="none" stroke="#4a4d56" stroke-width="1.2"/>
+    <line x1="16.0" y1="266.0" x2="25.8" y2="266.0" stroke="#4a4d56" stroke-width="1"/>
+    <rect x="31.5" y="276.5" width="22.5" height="67.5" rx="1.5" fill="none" stroke="#4a4d56" stroke-width="1.2"/>
+    <rect x="57.8" y="256.5" width="20.0" height="87.5" rx="1.5" fill="none" stroke="#4a4d56" stroke-width="1.2"/>
+    <rect x="81.5" y="266.5" width="17.5" height="77.5" rx="1.5" fill="none" stroke="#4a4d56" stroke-width="1.2"/>
+    <line x1="83.5" y1="283.6" x2="97.0" y2="283.6" stroke="#4a4d56" stroke-width="1"/>
+    <rect x="102.8" y="249.0" width="15.0" height="95.0" rx="1.5" fill="none" stroke="#4a4d56" stroke-width="1.2"/>
+    <rect x="121.5" y="284.0" width="12.5" height="60.0" rx="1.5" fill="none" stroke="#4a4d56" stroke-width="1.2"/>
+    <rect x="137.8" y="259.0" width="21.3" height="85.0" rx="1.5" fill="none" stroke="#4a4d56" stroke-width="1.2"/>
+    <line x1="139.8" y1="277.7" x2="157.0" y2="277.7" stroke="#4a4d56" stroke-width="1"/>
+  </g>
+  <g>
+    <rect x="480.0" y="266.5" width="17.5" height="77.5" rx="1.5" fill="none" stroke="#4a4d56" stroke-width="1.2"/>
+    <line x1="482.0" y1="283.6" x2="495.5" y2="283.6" stroke="#4a4d56" stroke-width="1"/>
+    <rect x="501.3" y="249.0" width="15.0" height="95.0" rx="1.5" fill="none" stroke="#4a4d56" stroke-width="1.2"/>
+    <rect x="520.0" y="276.5" width="50.0" height="67.5" rx="3.8" fill="none" stroke="#e8a33d" stroke-width="1.4"/>
+    <line x1="527.5" y1="276.5" x2="527.5" y2="344" stroke="#e8a33d" stroke-width="1.2"/>
+    <line x1="535.0" y1="319.7" x2="562.5" y2="319.7" stroke="#e8a33d" stroke-width="1.6" stroke-linecap="round" opacity=".6"/>
+    <path d="M546.0 266.5h10.0v53.2l-5.0 -5.0l-5.0 5.0z" fill="#e8a33d"/>
+    <rect x="576.3" y="259.0" width="21.3" height="85.0" rx="1.5" fill="none" stroke="#4a4d56" stroke-width="1.2"/>
+    <line x1="578.3" y1="277.7" x2="595.5" y2="277.7" stroke="#4a4d56" stroke-width="1"/>
+    <rect x="601.3" y="269.0" width="18.8" height="75.0" rx="1.5" fill="none" stroke="#4a4d56" stroke-width="1.2"/>
+    <rect x="623.8" y="251.5" width="16.3" height="92.5" rx="1.5" fill="none" stroke="#4a4d56" stroke-width="1.2"/>
+    <rect x="643.8" y="274.0" width="13.8" height="70.0" rx="1.5" fill="none" stroke="#4a4d56" stroke-width="1.2"/>
+    <line x1="645.8" y1="289.4" x2="655.5" y2="289.4" stroke="#4a4d56" stroke-width="1"/>
+  </g>
+  <line x1="0" y1="345" x2="160" y2="345" stroke="#3a3d46" stroke-width="2.5"/>
+  <line x1="476" y1="345" x2="640" y2="345" stroke="#3a3d46" stroke-width="2.5"/>
+</svg>

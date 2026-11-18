@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 240">
+  <!-- Jensuisla profile banner (17:6). Discord lays the avatar over the bottom-left corner: keep it empty. Fonts: Literata 700 and 500 italic. -->
+  <defs><radialGradient id="glow" cx=".82" cy="1" r=".6"><stop offset="0" stop-color="#e8a33d" stop-opacity=".18"/><stop offset="1" stop-color="#e8a33d" stop-opacity="0"/></radialGradient></defs>
+  <rect width="680" height="240" fill="#16171b"/>
+  <rect width="680" height="240" fill="url(#glow)"/>
+  <text x="40" y="92" font-family="Literata, Georgia, serif" font-weight="700" font-size="50" fill="#e9e7e2">Jensuisla</text>
+  <text x="43" y="124" font-family="Literata, Georgia, serif" font-style="italic" font-weight="500" font-size="17" fill="#a3a6ae">Lire ensemble, sans spoiler.</text>
+  <g>
+    <rect x="372.0" y="135.0" width="15.0" height="87.0" rx="1.5" fill="none" stroke="#5a5d66" stroke-width="1.2"/>
+    <rect x="391.5" y="114.0" width="25.5" height="108.0" rx="1.5" fill="none" stroke="#5a5d66" stroke-width="1.2"/>
+    <line x1="393.5" y1="137.8" x2="415.0" y2="137.8" stroke="#5a5d66" stroke-width="1"/>
+    <rect x="421.5" y="147.0" width="22.5" height="75.0" rx="1.5" fill="none" stroke="#5a5d66" stroke-width="1.2"/>
+    <rect x="448.5" y="123.0" width="19.5" height="99.0" rx="1.5" fill="none" stroke="#5a5d66" stroke-width="1.2"/>
+    <rect x="472.5" y="102.0" width="16.5" height="120.0" rx="1.5" fill="none" stroke="#5a5d66" stroke-width="1.2"/>
+    <line x1="474.5" y1="128.4" x2="487.0" y2="128.4" stroke="#5a5d66" stroke-width="1"/>
+    <rect x="493.5" y="141.0" width="60.0" height="81.0" rx="4.5" fill="none" stroke="#e8a33d" stroke-width="1.4"/>
+    <line x1="502.5" y1="141.0" x2="502.5" y2="222" stroke="#e8a33d" stroke-width="1.2"/>
+    <line x1="511.5" y1="192.8" x2="544.5" y2="192.8" stroke="#e8a33d" stroke-width="1.6" stroke-linecap="round" opacity=".6"/>
+    <path d="M524.7 129.0h12.0v63.8l-6.0 -6.0l-6.0 6.0z" fill="#e8a33d"/>
+    <rect x="561.0" y="117.0" width="24.0" height="105.0" rx="1.5" fill="none" stroke="#5a5d66" stroke-width="1.2"/>
+    <rect x="589.5" y="129.0" width="21.0" height="93.0" rx="1.5" fill="none" stroke="#5a5d66" stroke-width="1.2"/>
+    <line x1="591.5" y1="149.5" x2="608.5" y2="149.5" stroke="#5a5d66" stroke-width="1"/>
+    <rect x="615.0" y="108.0" width="18.0" height="114.0" rx="1.5" fill="none" stroke="#5a5d66" stroke-width="1.2"/>
+    <rect x="637.5" y="150.0" width="15.0" height="72.0" rx="1.5" fill="none" stroke="#5a5d66" stroke-width="1.2"/>
+    <rect x="657.0" y="120.0" width="25.5" height="102.0" rx="1.5" fill="none" stroke="#5a5d66" stroke-width="1.2"/>
+    <line x1="659.0" y1="142.4" x2="680.5" y2="142.4" stroke="#5a5d66" stroke-width="1"/>
+    <rect x="687.0" y="132.0" width="22.5" height="90.0" rx="1.5" fill="none" stroke="#5a5d66" stroke-width="1.2"/>
+  </g>
+  <line x1="356" y1="223" x2="680" y2="223" stroke="#3a3d46" stroke-width="2.5"/>
+</svg>
